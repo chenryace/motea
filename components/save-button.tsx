@@ -1,4 +1,4 @@
-import { FC, useState, useEffect } from 'react';
+import { FC, useState, useEffect, useCallback } from 'react';
 import { Button, Chip } from '@material-ui/core';
 import {
     DocumentIcon,
@@ -16,20 +16,32 @@ interface SaveButtonProps {
     className?: string;
 }
 
-type SyncStatus = 'synced' | 'local' | 'syncing' | 'error';
+type SyncStatus = 'synced' | 'local' | 'syncing' | 'error' | 'viewing';
 
 const SaveButton: FC<SaveButtonProps> = ({ className }) => {
-    const { syncToServer, note } = TiptapEditorState.useContainer();
+    const { syncToServer, note, onEditorChange } = TiptapEditorState.useContainer();
     const [isSaving, setIsSaving] = useState(false);
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
     const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+    const [hasLocalChanges, setHasLocalChanges] = useState(false);
     const router = useRouter();
+
+    // 监听编辑器内容变化
+    useEffect(() => {
+        if (!note?.id) return;
+
+        // 当有本地变化时，设置状态为需要保存
+        if (hasLocalChanges) {
+            setSyncStatus('local');
+        }
+    }, [hasLocalChanges, note?.id]);
 
     // Check sync status (借鉴旧项目的简单有效逻辑)
     useEffect(() => {
         const checkSyncStatus = async () => {
             if (!note?.id) {
                 setSyncStatus('synced');
+                setHasLocalChanges(false);
                 return;
             }
 
@@ -39,12 +51,14 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
 
             if (isPreviewMode) {
                 setSyncStatus('viewing');
+                setHasLocalChanges(false);
                 return;
             }
 
             const isNew = has(router.query, 'new');
             if (isNew) {
                 setSyncStatus('local');
+                setHasLocalChanges(true);
                 return;
             }
 
@@ -59,6 +73,7 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
 
                 if (!localNote) {
                     setSyncStatus('synced');
+                    setHasLocalChanges(false);
                     return;
                 }
 
@@ -69,21 +84,29 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
 
                     if (localTime > serverTime) {
                         setSyncStatus('local');
+                        setHasLocalChanges(true);
                     } else {
                         setSyncStatus('synced');
+                        setHasLocalChanges(false);
                     }
                 } else {
                     setSyncStatus('local');
+                    setHasLocalChanges(true);
                 }
             } catch (error) {
                 setSyncStatus('error');
+                setHasLocalChanges(false);
             }
         };
 
         checkSyncStatus();
+
+        // 设置定时检查，每5秒检查一次本地缓存变化
+        const interval = setInterval(checkSyncStatus, 5000);
+        return () => clearInterval(interval);
     }, [note, router.query]);
 
-    const handleSave = async () => {
+    const handleSave = useCallback(async () => {
         setIsSaving(true);
         setSyncStatus('syncing');
 
@@ -92,6 +115,7 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
             if (success) {
                 setSyncStatus('synced');
                 setLastSyncTime(new Date());
+                setHasLocalChanges(false);
             } else {
                 setSyncStatus('error');
             }
@@ -100,7 +124,7 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [syncToServer]);
 
     // Add keyboard shortcut Ctrl+S / Cmd+S (借鉴旧项目的实现)
     useEffect(() => {
@@ -163,12 +187,16 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
         switch (syncStatus) {
             case 'synced':
                 return 'primary';
+            case 'viewing':
+                return 'default';
             case 'local':
                 return 'secondary';
+            case 'syncing':
+                return 'primary';
             case 'error':
                 return 'secondary';
             default:
-                return 'primary';
+                return 'secondary';
         }
     };
 
