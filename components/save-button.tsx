@@ -1,128 +1,165 @@
-import { FC, useState, useEffect, useCallback } from 'react';
-import { Button, Chip } from '@material-ui/core';
+import { FC, useState, useEffect, useCallback, useRef } from 'react';
+import { Button, makeStyles } from '@material-ui/core';
 import {
+    EyeIcon,
     DocumentIcon,
     UploadIcon,
     CheckIcon,
-    XIcon,
-    EyeIcon
+    XIcon
 } from '@heroicons/react/outline';
 import TiptapEditorState from 'libs/web/state/tiptap-editor';
 import noteCache from 'libs/web/cache/note';
-import { useRouter } from 'next/router';
-import { has } from 'lodash';
 
 interface SaveButtonProps {
     className?: string;
 }
 
-type SyncStatus = 'synced' | 'local' | 'syncing' | 'error' | 'viewing';
+type SyncStatus = 'view' | 'save' | 'syncing' | 'synced' | 'fail';
+
+// 自定义样式
+const useStyles = makeStyles({
+    saveButton: {
+        minWidth: '80px', // 加大宽度
+        fontWeight: 'bold',
+        textTransform: 'none',
+        borderRadius: '8px', // 添加圆角
+        boxShadow: 'none !important', // 移除阴影
+        '&:hover': {
+            opacity: 0.8,
+            boxShadow: 'none !important', // 悬停时也不要阴影
+        },
+        '&:focus': {
+            boxShadow: 'none !important', // 聚焦时也不要阴影
+        },
+        '&:active': {
+            boxShadow: 'none !important', // 点击时也不要阴影
+        },
+    },
+    // view 状态：灰色背景白色字
+    viewButton: {
+        backgroundColor: '#6B7280 !important', // 灰色
+        color: '#FFFFFF !important', // 白色字
+        '&:hover': {
+            backgroundColor: '#4B5563 !important',
+        },
+    },
+    // save 状态：红色背景白色字
+    saveStateButton: {
+        backgroundColor: '#DC2626 !important', // 红色
+        color: '#FFFFFF !important', // 白色字
+        '&:hover': {
+            backgroundColor: '#B91C1C !important',
+        },
+    },
+    // syncing 状态：蓝色背景白色字
+    syncingButton: {
+        backgroundColor: '#2563EB !important', // 蓝色
+        color: '#FFFFFF !important', // 白色字
+        '&:hover': {
+            backgroundColor: '#1D4ED8 !important',
+        },
+    },
+    // synced 状态：黄色背景黑色字
+    syncedButton: {
+        backgroundColor: '#FBBF24 !important', // 黄色
+        color: '#000000 !important', // 黑色字
+        '&:hover': {
+            backgroundColor: '#F59E0B !important',
+        },
+    },
+    // failed 状态：红色背景白色字
+    failedButton: {
+        backgroundColor: '#DC2626 !important', // 红色
+        color: '#FFFFFF !important', // 白色字
+        '&:hover': {
+            backgroundColor: '#B91C1C !important',
+        },
+    },
+});
 
 const SaveButton: FC<SaveButtonProps> = ({ className }) => {
-    const { syncToServer, note, onEditorChange } = TiptapEditorState.useContainer();
-    const [isSaving, setIsSaving] = useState(false);
-    const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
-    const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-    const [hasLocalChanges, setHasLocalChanges] = useState(false);
-    const router = useRouter();
+    const classes = useStyles();
+    const { syncToServer, note } = TiptapEditorState.useContainer();
+    const [syncStatus, setSyncStatus] = useState<SyncStatus>('view');
+    const syncedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 监听编辑器内容变化
+    // 监听 IndexedDB 变化来检测编辑状态
     useEffect(() => {
         if (!note?.id) return;
 
-        // 当有本地变化时，设置状态为需要保存
-        if (hasLocalChanges) {
-            setSyncStatus('local');
-        }
-    }, [hasLocalChanges, note?.id]);
+        let isEditing = false;
 
-    // Check sync status (借鉴旧项目的简单有效逻辑)
-    useEffect(() => {
-        const checkSyncStatus = async () => {
-            if (!note?.id) {
-                setSyncStatus('synced');
-                setHasLocalChanges(false);
-                return;
-            }
-
-            // 检查是否在预览模式
-            const isPreviewMode = router.query.preview === 'true' ||
-                                document.querySelector('.ProseMirror')?.getAttribute('contenteditable') === 'false';
-
-            if (isPreviewMode) {
-                setSyncStatus('viewing');
-                setHasLocalChanges(false);
-                return;
-            }
-
-            const isNew = has(router.query, 'new');
-            if (isNew) {
-                setSyncStatus('local');
-                setHasLocalChanges(true);
-                return;
-            }
-
-            // 始终设置上次保存时间（如果笔记有更新时间）
-            if (note.updated_at) {
-                setLastSyncTime(new Date(note.updated_at));
-            }
-
+        const checkIndexedDBChanges = async () => {
             try {
-                // 借鉴旧项目：检查本地缓存是否有更新
                 const localNote = await noteCache.getItem(note.id);
-
-                if (!localNote) {
-                    setSyncStatus('synced');
-                    setHasLocalChanges(false);
-                    return;
-                }
-
-                // 简单比较：如果有本地缓存且时间戳更新，说明有本地更改
-                if (localNote.updated_at && note.updated_at) {
-                    const localTime = new Date(localNote.updated_at);
-                    const serverTime = new Date(note.updated_at);
-
-                    if (localTime > serverTime) {
-                        setSyncStatus('local');
-                        setHasLocalChanges(true);
-                    } else {
-                        setSyncStatus('synced');
-                        setHasLocalChanges(false);
+                if (localNote && localNote.content !== note.content) {
+                    if (!isEditing) {
+                        isEditing = true;
+                        setSyncStatus('save');
                     }
-                } else {
-                    setSyncStatus('local');
-                    setHasLocalChanges(true);
                 }
             } catch (error) {
-                setSyncStatus('error');
-                setHasLocalChanges(false);
+                console.error('Error checking IndexedDB:', error);
             }
         };
 
-        checkSyncStatus();
+        // 定期检查 IndexedDB 变化
+        const interval = setInterval(checkIndexedDBChanges, 1000);
 
-        // 设置定时检查，每5秒检查一次本地缓存变化
-        const interval = setInterval(checkSyncStatus, 5000);
-        return () => clearInterval(interval);
-    }, [note, router.query]);
+        return () => {
+            clearInterval(interval);
+            if (syncedTimeoutRef.current) {
+                clearTimeout(syncedTimeoutRef.current);
+            }
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+            }
+        };
+    }, [note]);
 
     const handleSave = useCallback(async () => {
-        setIsSaving(true);
         setSyncStatus('syncing');
+
+        // 清除之前的超时
+        if (syncedTimeoutRef.current) {
+            clearTimeout(syncedTimeoutRef.current);
+        }
+        if (syncTimeoutRef.current) {
+            clearTimeout(syncTimeoutRef.current);
+        }
+
+        // 设置上传超时（30秒）
+        syncTimeoutRef.current = setTimeout(() => {
+            setSyncStatus('fail');
+        }, 30000);
 
         try {
             const success = await syncToServer();
+
+            // 清除超时
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+                syncTimeoutRef.current = null;
+            }
+
             if (success) {
                 setSyncStatus('synced');
-                setLastSyncTime(new Date());
-                setHasLocalChanges(false);
+
+                // 3秒后回到 view 状态
+                syncedTimeoutRef.current = setTimeout(() => {
+                    setSyncStatus('view');
+                }, 3000);
             } else {
-                setSyncStatus('error');
+                setSyncStatus('fail');
             }
         } catch (error) {
-            setSyncStatus('error');
-        } finally {
-            setIsSaving(false);
+            // 清除超时
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+                syncTimeoutRef.current = null;
+            }
+            setSyncStatus('fail');
         }
     }, [syncToServer]);
 
@@ -152,76 +189,72 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
 
     const getButtonIcon = () => {
         switch (syncStatus) {
-            case 'viewing':
-                return <EyeIcon className="w-4 h-4 animate-pulse" />;
+            case 'view':
+                return <EyeIcon className="w-4 h-4" />;
+            case 'save':
+                return <DocumentIcon className="w-4 h-4" />;
             case 'syncing':
                 return <UploadIcon className="w-4 h-4 animate-pulse" />;
             case 'synced':
                 return <CheckIcon className="w-4 h-4" />;
-            case 'error':
+            case 'fail':
                 return <XIcon className="w-4 h-4" />;
-            case 'local':
             default:
-                return <DocumentIcon className="w-4 h-4" />;
+                return <EyeIcon className="w-4 h-4" />;
         }
     };
 
     const getButtonText = () => {
         switch (syncStatus) {
-            case 'viewing':
-                return 'Viewing';
+            case 'view':
+                return 'View';
+            case 'save':
+                return 'Save';
             case 'syncing':
                 return 'Syncing...';
             case 'synced':
-                return 'Updated';
-            case 'error':
-                return 'X Retry';
-            case 'local':
-                return 'Save';
+                return 'Synced';
+            case 'fail':
+                return 'Failed';
             default:
-                return 'Save';
+                return 'View';
         }
     };
 
-    const getStatusColor = () => {
+    const getButtonClassName = () => {
+        const baseClass = `${classes.saveButton}`;
         switch (syncStatus) {
-            case 'synced':
-                return 'primary';
-            case 'viewing':
-                return 'default';
-            case 'local':
-                return 'secondary';
+            case 'view':
+                return `${baseClass} ${classes.viewButton}`;
+            case 'save':
+                return `${baseClass} ${classes.saveStateButton}`;
             case 'syncing':
-                return 'primary';
-            case 'error':
-                return 'secondary';
+                return `${baseClass} ${classes.syncingButton}`;
+            case 'synced':
+                return `${baseClass} ${classes.syncedButton}`;
+            case 'fail':
+                return `${baseClass} ${classes.failedButton}`;
             default:
-                return 'secondary';
+                return `${baseClass} ${classes.viewButton}`;
         }
+    };
+
+    const isButtonDisabled = () => {
+        return syncStatus === 'syncing' || syncStatus === 'view';
     };
 
     return (
-        <div className="flex items-center gap-2">
-            {/* 始终显示上次保存时间（如果存在） */}
-            {lastSyncTime && (
-                <span className="text-xs text-gray-500">
-                    Last saved: {lastSyncTime.toLocaleTimeString()}
-                </span>
-            )}
-
-            <Button
-                variant="contained"
-                color={getStatusColor()}
-                startIcon={getButtonIcon()}
-                onClick={handleSave}
-                disabled={isSaving}
-                className={className}
-                size="small"
-                data-save-button="true"
-            >
-                {getButtonText()}
-            </Button>
-        </div>
+        <Button
+            variant="contained"
+            startIcon={getButtonIcon()}
+            onClick={handleSave}
+            disabled={isButtonDisabled()}
+            className={`${getButtonClassName()} ${className || ''}`}
+            size="small"
+            data-save-button="true"
+        >
+            {getButtonText()}
+        </Button>
     );
 };
 

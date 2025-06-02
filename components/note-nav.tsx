@@ -13,6 +13,7 @@ import { NOTE_SHARED } from 'libs/shared/meta';
 import useI18n from 'libs/web/hooks/use-i18n';
 import NavButtonGroup from './nav-button-group';
 import SaveButton from './save-button';
+import UpdatedAtDisplay from './updated-at-display';
 import { EyeIcon } from '@heroicons/react/outline';
 
 const MenuButton = () => {
@@ -119,6 +120,8 @@ const NoteNav = () => {
                                     {note.title}
                                 </span>
                             </Tooltip>
+                            {/* 在标题后面显示 UpdatedAt 信息 */}
+                            <UpdatedAtDisplay className="inline-block ml-2" />
                             {!checkItemIsShown(note) && (
                                 <Tooltip title={t('Show note in tree')}>
                                     <span>
