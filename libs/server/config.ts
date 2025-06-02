@@ -44,6 +44,8 @@ export interface PostgreSQLStoreConfiguration {
     type: 'postgresql';
     connectionString: string;
     prefix: string;
+    provider?: 'self-hosted' | 'supabase';
+    ssl?: boolean;
 }
 
 export type StoreConfiguration = S3StoreConfiguration | PostgreSQLStoreConfiguration;
@@ -251,26 +253,63 @@ export function loadConfigAndListErrors(): {
 
     // This version only supports PostgreSQL
     const postgresUrl = env.getEnvRaw('DATABASE_URL', false);
+    const supabaseUrl = env.getEnvRaw('SUPABASE_URL', false);
+    const supabaseKey = env.getEnvRaw('SUPABASE_ANON_KEY', false);
+
+    // 检测数据库提供商
+    let provider: 'self-hosted' | 'supabase' = 'self-hosted';
+    let connectionString = postgresUrl || '';
+    let ssl = false;
+
+    if (supabaseUrl && supabaseKey) {
+        // Supabase 配置
+        provider = 'supabase';
+        connectionString = `postgresql://postgres:[YOUR-PASSWORD]@${supabaseUrl.replace('https://', '').replace('http://', '')}:5432/postgres`;
+        ssl = true;
+
+        // 如果提供了完整的 DATABASE_URL，优先使用
+        if (postgresUrl && postgresUrl.includes('supabase')) {
+            connectionString = postgresUrl;
+        }
+    } else if (postgresUrl) {
+        // 自建 PostgreSQL
+        provider = 'self-hosted';
+        connectionString = postgresUrl;
+        // 检测是否需要 SSL
+        ssl = postgresUrl.includes('sslmode=require') || postgresUrl.includes('ssl=true');
+    }
 
     store = {
         type: 'postgresql',
-        connectionString: postgresUrl || '',
+        connectionString,
         prefix: env.getEnvRaw('STORE_PREFIX', false) || '',
+        provider,
+        ssl,
     } as PostgreSQLStoreConfiguration;
 
-    if (!postgresUrl) {
+    if (!connectionString) {
         errors.push({
             name: 'PostgreSQL connection string missing',
-            description: 'DATABASE_URL environment variable is required',
+            description: 'DATABASE_URL environment variable is required, or SUPABASE_URL + SUPABASE_ANON_KEY for Supabase',
             severity: IssueSeverity.FATAL_ERROR,
             category: IssueCategory.CONFIG,
             fixes: [
                 {
-                    description: 'Set the DATABASE_URL environment variable',
+                    description: 'Set the DATABASE_URL environment variable for self-hosted PostgreSQL',
                     recommendation: IssueFixRecommendation.RECOMMENDED,
                     steps: [
                         ErrInstruction.ENV_EDIT,
                         'Set DATABASE_URL to your PostgreSQL connection string (e.g., postgresql://user:password@host:port/database)',
+                    ],
+                },
+                {
+                    description: 'Set Supabase environment variables',
+                    recommendation: IssueFixRecommendation.RECOMMENDED,
+                    steps: [
+                        ErrInstruction.ENV_EDIT,
+                        'Set SUPABASE_URL to your Supabase project URL',
+                        'Set SUPABASE_ANON_KEY to your Supabase anon key',
+                        'Set DATABASE_URL to your Supabase PostgreSQL connection string',
                     ],
                 },
             ],

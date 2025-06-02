@@ -1,5 +1,8 @@
 type AllowedEnvs =
     | 'PASSWORD'
+    | 'DATABASE_URL'
+    | 'SUPABASE_URL'
+    | 'SUPABASE_ANON_KEY'
     | 'STORE_ACCESS_KEY'
     | 'STORE_SECRET_KEY'
     | 'STORE_BUCKET'
