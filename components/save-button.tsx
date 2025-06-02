@@ -132,6 +132,10 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
         // 设置上传超时（30秒）
         syncTimeoutRef.current = setTimeout(() => {
             setSyncStatus('fail');
+            // failed 状态 2 秒后自动回到 view
+            setTimeout(() => {
+                setSyncStatus('view');
+            }, 2000);
         }, 30000);
 
         try {
@@ -152,6 +156,10 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
                 }, 3000);
             } else {
                 setSyncStatus('fail');
+                // failed 状态 2 秒后自动回到 view
+                setTimeout(() => {
+                    setSyncStatus('view');
+                }, 2000);
             }
         } catch (error) {
             // 清除超时
@@ -160,8 +168,27 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
                 syncTimeoutRef.current = null;
             }
             setSyncStatus('fail');
+            // failed 状态 2 秒后自动回到 view
+            setTimeout(() => {
+                setSyncStatus('view');
+            }, 2000);
         }
     }, [syncToServer]);
+
+    // 暴露状态和保存方法给外部使用
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            (window as any).saveButtonStatus = syncStatus;
+            (window as any).saveButtonAutoSave = handleSave;
+        }
+
+        return () => {
+            if (typeof window !== 'undefined') {
+                delete (window as any).saveButtonStatus;
+                delete (window as any).saveButtonAutoSave;
+            }
+        };
+    }, [syncStatus, handleSave]);
 
     // Add keyboard shortcut Ctrl+S / Cmd+S (借鉴旧项目的实现)
     useEffect(() => {

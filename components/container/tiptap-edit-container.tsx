@@ -7,6 +7,7 @@ import NoteState from 'libs/web/state/note';
 import NoteTreeState from 'libs/web/state/tree';
 import UIState from 'libs/web/state/ui';
 import { useToast } from 'libs/web/hooks/use-toast';
+import useAutoSaveOnLeave from 'libs/web/hooks/use-auto-save-on-leave';
 import noteCache from 'libs/web/cache/note';
 import NoteNav from 'components/note-nav';
 import DeleteAlert from 'components/editor/delete-alert';
@@ -22,6 +23,11 @@ const TiptapEditContainer: FC = () => {
         settings: { settings },
     } = UIState.useContainer();
     const toast = useToast();
+
+    // 启用自动保存功能
+    useAutoSaveOnLeave({
+        enabled: true,
+    });
 
     useEffect(() => {
         const initializeEditor = async () => {
