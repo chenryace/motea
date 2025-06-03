@@ -21,7 +21,7 @@ export const SettingFooter = () => {
                 >
                     Notea Contributors
                 </a>
-                <span>Enhanced by waycaan 2025</span>Add commentMore actions
+                <span> -Enhanced by waycaan 2025-</span>
             </div>
         </footer>
     );
