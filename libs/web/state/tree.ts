@@ -50,76 +50,63 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
 
     const fetchNotes = useCallback(
         async (tree: TreeModel) => {
-            // 1. 获取预加载数量配置 (简化版)
             const preloadCount = parseInt(process.env.PRELOAD_NOTES_COUNT || '10', 10);
             console.log(`⚙️ 预加载配置: ${preloadCount} 个笔记`);
 
-            // 2. 获取所有非root笔记，按updated_at排序
             const allNotes = Object.values(tree.items)
                 .filter(item => item.id !== ROOT_ID && item.data)
                 .sort((a, b) => {
                     const timeA = a.data?.updated_at ? new Date(a.data.updated_at).getTime() : 0;
                     const timeB = b.data?.updated_at ? new Date(b.data.updated_at).getTime() : 0;
-                    return timeB - timeA; // 降序排列，最新的在前
+                    return timeB - timeA;
                 });
 
-            // 3. 根据环境变量配置决定加载数量
             const priorityNotes = allNotes.slice(0, preloadCount);
             const otherNotes = allNotes.slice(preloadCount);
 
             console.log(`📊 Total notes: ${allNotes.length}, Priority: ${priorityNotes.length}, Others: ${otherNotes.length}`);
 
-            // 4. 处理优先队列：检查缓存并决定是否需要API请求
             const priorityNotesToLoad: string[] = [];
 
             for (const item of priorityNotes) {
                 const cache = await noteCache.getItem(item.id);
 
                 if (cache && item.data?.updated_at && cache.updated_at === item.data.updated_at) {
-                    // 缓存有效，合并元数据和缓存内容
                     tree.items[item.id].data = {
-                        ...item.data, // 保留树结构中的元数据
-                        ...cache,     // 添加缓存中的完整内容
+                        ...item.data,
+                        ...cache,
                     };
                     console.log(`✅ Cache hit for priority note: ${item.id}`);
                 } else {
-                    // 🔧 关键修复：缓存无效时先清除旧缓存
                     if (cache) {
                         console.log(`🗑️ Clearing stale cache for note: ${item.id} (meta_time: ${item.data?.updated_at}, cache_time: ${cache?.updated_at})`);
                         await noteCache.removeItem(item.id);
                     }
 
-                    // 缓存无效或不存在，需要API请求
                     priorityNotesToLoad.push(item.id);
                     console.log(`📡 Will fetch priority note: ${item.id} (cache: ${!!cache}, meta_time: ${item.data?.updated_at}, cache_time: ${cache?.updated_at})`);
                 }
             }
 
-            // 5. 处理其他笔记：只检查缓存，不主动加载
             for (const item of otherNotes) {
                 const cache = await noteCache.getItem(item.id);
 
                 if (cache && item.data?.updated_at && cache.updated_at === item.data.updated_at) {
-                    // 缓存有效，合并元数据和缓存内容
                     tree.items[item.id].data = {
-                        ...item.data, // 保留树结构中的元数据
-                        ...cache,     // 添加缓存中的完整内容
+                        ...item.data, 
+                        ...cache,
                     };
                     console.log(`✅ Cache hit for other note: ${item.id}`);
                 } else {
-                    // 🔧 关键修复：缓存无效时先清除旧缓存
                     if (cache) {
                         console.log(`🗑️ Clearing stale cache for other note: ${item.id} (meta_time: ${item.data?.updated_at}, cache_time: ${cache?.updated_at})`);
                         await noteCache.removeItem(item.id);
                     }
 
-                    // 缓存无效，但不主动加载，保留元数据用于显示标题
-                    // tree.items[item.id].data 已经包含了从服务器获取的元数据
                     console.log(`⏳ Cache miss for other note: ${item.id}, will load on demand (has metadata: ${!!item.data})`);
                 }
             }
 
-            // 6. 批量加载需要的优先笔记
             if (priorityNotesToLoad.length > 0) {
                 console.log(`🚀 Loading ${priorityNotesToLoad.length} priority notes from API`);
 
@@ -127,11 +114,10 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
                     priorityNotesToLoad.map(async (id) => {
                         try {
                             const noteData = await fetchNote(id);
-                            // 合并树结构中的元数据和API返回的完整数据
                             tree.items[id].data = {
-                                ...tree.items[id].data, // 保留树结构中的元数据
-                                ...noteData,             // 添加API返回的完整内容
-                                id,                      // 确保ID存在
+                                ...tree.items[id].data, 
+                                ...noteData,
+                                id,
                             } as NoteModel;
                             console.log(`✅ Loaded priority note: ${id}`);
                         } catch (error) {
@@ -182,7 +168,6 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
         setInitLoaded(true);
     }, [fetchNotes, fetchTree, toast]);
 
-    // 按需加载笔记数据（用于用户点击未加载的笔记时）
     const loadNoteOnDemand = useCallback(async (noteId: string) => {
         const currentItem = treeRef.current.items[noteId];
         if (!currentItem) {
@@ -190,7 +175,6 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
             return null;
         }
 
-        // 🔧 检查缓存是否有效，无效则清除
         const cache = await noteCache.getItem(noteId);
         const serverMeta = currentItem.data;
 
@@ -199,7 +183,6 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
             await noteCache.removeItem(noteId);
         }
 
-        // 检查是否已经加载完整内容且缓存有效
         if (currentItem.data && currentItem.data.content !== undefined &&
             cache && serverMeta?.updated_at && cache.updated_at === serverMeta.updated_at) {
             console.log(`✅ Note ${noteId} already loaded`);
@@ -210,7 +193,6 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
             console.log(`🔄 Loading note ${noteId} on demand...`);
             const noteData = await fetchNote(noteId);
 
-            // 更新树结构
             const updatedTree = TreeActions.mutateItem(treeRef.current, noteId, {
                 data: noteData
             });
@@ -276,7 +258,6 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
         async (id: string, data: Partial<TreeItemModel>) => {
             setTree(TreeActions.mutateItem(treeRef.current, id, data));
             delete data.data;
-            // @todo diff 没有变化就不发送请求
             if (!isEmpty(data)) {
                 await mutate({
                     action: 'mutate',

@@ -107,11 +107,9 @@ const useNote = (initData?: NoteModel) => {
 
             result.content = result.content || '\n';
 
-            // 更新缓存和状态
             await noteCache.setItem(result.id, result);
             setNote(result);
 
-            // 添加到树结构
             addItem(result);
 
             return result;
@@ -140,9 +138,6 @@ const useNote = (initData?: NoteModel) => {
         [addItem, create, genNewId]
     );
 
-    /**
-     * TODO: merge with mutateNote
-     */
     const updateNote = useCallback(
         async (data: Partial<NoteModel>) => {
             abort();
@@ -152,13 +147,12 @@ const useNote = (initData?: NoteModel) => {
                 return;
             }
 
-            // 获取最新的本地数据（包括内容）
             const localNote = await noteCache.getItem(note.id);
             const noteToUpdate = localNote || note;
 
             const updateData = {
                 ...data,
-                content: data.content || noteToUpdate.content, // 确保包含内容
+                content: data.content || noteToUpdate.content, 
             };
 
             const newNote = {
@@ -171,7 +165,6 @@ const useNote = (initData?: NoteModel) => {
                 data: newNote,
             });
 
-            // 发送包含内容的更新请求
             const result = await mutate(note.id, updateData);
             await noteCache.mutateItem(note.id, updateData);
 

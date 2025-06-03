@@ -13,7 +13,6 @@ export function basicAuthenticate(
 ): AuthenticationData | false {
     const cfg = config().auth as BasicAuthConfiguration;
     if (cfg.users) {
-        // Multi-user configuration takes precedence over single-user
         const { username, password } = request.body;
         if (!username || !password) {
             throw new Error('Username and password must be specified');

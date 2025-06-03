@@ -24,7 +24,6 @@ function useTrash() {
 
     const restoreNote = useCallback(
         async (note: NoteModel) => {
-            // 父页面被删除时，恢复页面的 parent 改成 root
             const pNote = note.pid && (await noteCache.getItem(note.pid));
             if (
                 !note.pid ||

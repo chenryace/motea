@@ -28,7 +28,6 @@ export function isLoggedIn(req: ApiRequest) {
 }
 
 export const applyAuth: SSRMiddleware = async (req, _res, next) => {
-    // const IS_DEMO = getEnv<boolean>('IS_DEMO', false);
 
     req.props = {
         ...req.props,
@@ -47,7 +46,6 @@ export const applyRedirectLogin: (resolvedUrl: string) => SSRMiddleware =
             permanent: false,
         };
 
-        // note 存在的情况
         if (req.props.pageMode) {
             if (
                 req.props.pageMode !== PageMode.PUBLIC &&
@@ -55,7 +53,6 @@ export const applyRedirectLogin: (resolvedUrl: string) => SSRMiddleware =
             ) {
                 req.redirect = redirect;
             }
-            // 访问首页没有 note，则判断是否登录
         } else if (!req.props.isLoggedIn) {
             req.redirect = redirect;
         }

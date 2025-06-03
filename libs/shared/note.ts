@@ -3,9 +3,6 @@ import { EDITOR_SIZE, NOTE_DELETED, NOTE_PINNED, NOTE_SHARED } from './meta';
 export interface NoteModel {
     id: string;
     title: string;
-    /**
-     * Parent ID
-     */
     pid?: string;
     content?: string;
     pic?: string;
@@ -14,13 +11,11 @@ export interface NoteModel {
     shared: NOTE_SHARED;
     pinned: NOTE_PINNED;
     editorsize: EDITOR_SIZE | null;
-    isDailyNote?: boolean; // 标记是否为每日笔记
-    updated_at?: string; // 添加更新时间字段
+    isDailyNote?: boolean; 
+    updated_at?: string; 
 }
 
-/**
- * like `/IHqMRohfi2`
- */
+
 export const isNoteLink = (str: string) => {
     return new RegExp(`^/${NOTE_ID_REGEXP}$`).test(str);
 };

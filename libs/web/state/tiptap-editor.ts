@@ -60,7 +60,6 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         [note]
     );
 
-    // Manual sync to server (借鉴旧项目的核心逻辑)
     const syncToServer = useCallback(
         async () => {
             if (!note?.id) return false;
@@ -68,12 +67,10 @@ const useTiptapEditor = (initNote?: NoteModel) => {
             const isNew = has(router.query, 'new');
 
             try {
-                // 借鉴旧项目：优先使用IndexedDB中的最新数据
                 const localNote = await noteCache.getItem(note.id);
                 const noteToSave = localNote || note;
 
                 if (isNew) {
-                    // 借鉴旧项目：创建新笔记时包含完整数据
                     const noteData = {
                         ...noteToSave,
                         pid: (router.query.pid as string) || ROOT_ID
@@ -82,7 +79,6 @@ const useTiptapEditor = (initNote?: NoteModel) => {
                     const item = await createNote(noteData);
 
                     if (item) {
-                        // 借鉴旧项目：成功后移除?new参数
                         const noteUrl = `/${item.id}`;
                         if (router.asPath !== noteUrl) {
                             await router.replace(noteUrl, undefined, { shallow: true });
@@ -91,18 +87,15 @@ const useTiptapEditor = (initNote?: NoteModel) => {
                         return true;
                     }
                 } else {
-                    // 借鉴旧项目：更新现有笔记
                     const updatedNote = await updateNote(noteToSave);
 
                     if (updatedNote) {
-                        // 借鉴旧项目：用服务器响应更新本地缓存
                         await noteCache.setItem(updatedNote.id, updatedNote);
                         toast('Note updated on server', 'success');
                         return true;
                     }
                 }
             } catch (error) {
-                console.error('Sync to server failed:', error);
                 toast('Failed to save note to server', 'error');
                 return false;
             }
@@ -127,13 +120,6 @@ const useTiptapEditor = (initNote?: NoteModel) => {
 
     const onSearchLink = useCallback(
         async (term: string) => {
-            // 简化搜索功能，暂时返回空数组
-            // const searchResults = await searchNote(term, NOTE_DELETED.NORMAL);
-            // return searchResults.map((item) => ({
-            //     title: item.title,
-            //     url: `/${item.id}`,
-            //     subtitle: searchRangeText(item.content),
-            // }));
             return [];
         },
         []
@@ -145,7 +131,6 @@ const useTiptapEditor = (initNote?: NoteModel) => {
                 event.preventDefault();
                 router.push(href);
             } else {
-                // 外部链接，在新窗口打开
                 window.open(href, '_blank', 'noopener,noreferrer');
             }
         },
@@ -162,9 +147,6 @@ const useTiptapEditor = (initNote?: NoteModel) => {
     );
 
     const onHoverLink = useCallback((event: ReactMouseEvent) => {
-        // 简化悬停处理
-        // const { setLinkElement } = PortalState.useContainer();
-        // setLinkElement(event.target as HTMLElement);
         return true;
     }, []);
 
@@ -189,60 +171,46 @@ const useTiptapEditor = (initNote?: NoteModel) => {
 
             let title: string;
             if (note?.isDailyNote) {
-                // 每日笔记：保持原标题不变（日期格式）
                 title = note.title;
             } else {
-                // 普通笔记：只有在标题为空时才自动填充
-                // 首先尝试从页面上的标题输入框获取当前值
                 let currentTitle = '';
 
-                // 尝试从页面上的标题输入框获取当前值
                 const titleInput = document.querySelector('h1 textarea') as HTMLTextAreaElement;
                 if (titleInput && titleInput.value) {
                     currentTitle = titleInput.value.trim();
                 } else {
-                    // 如果无法从DOM获取，则从 IndexedDB 获取最新标题
                     if (note?.id) {
                         try {
                             const localNote = await noteCache.getItem(note.id);
                             currentTitle = localNote?.title || '';
                         } catch (error) {
-                            // 如果 IndexedDB 获取失败，使用 note 对象中的标题
                             currentTitle = note?.title || '';
                         }
                     } else {
-                        // 如果没有 ID，使用 note 对象中的标题
                         currentTitle = note?.title || '';
                     }
                 }
 
-                // 🔧 修复自动标题提取：处理更多情况
                 if (!currentTitle ||
                     currentTitle === 'Untitled' ||
                     currentTitle === 'New Page' ||
                     currentTitle === '' ||
-                    // 检测到HTML标签说明标题损坏，需要重新提取
                     (currentTitle.includes('<') && currentTitle.includes('>'))) {
 
                     const lines = content.split('\n');
                     const firstLine = lines[0]?.replace(/^#\s*/, '').trim() || '';
 
-                    // 🔧 改进标题提取：只取第一行的纯文本部分
                     if (firstLine) {
-                        // 移除可能的markdown格式
                         title = firstLine
-                            .replace(/\*\*(.*?)\*\*/g, '$1')  // 移除粗体
-                            .replace(/\*(.*?)\*/g, '$1')      // 移除斜体
-                            .replace(/`(.*?)`/g, '$1')        // 移除代码
-                            .replace(/\[(.*?)\]\(.*?\)/g, '$1') // 移除链接，保留文本
+                            .replace(/\*\*(.*?)\*\*/g, '$1')
+                            .replace(/\*(.*?)\*/g, '$1')
+                            .replace(/`(.*?)`/g, '$1')
+                            .replace(/\[(.*?)\]\(.*?\)/g, '$1')
                             .trim();
                     } else {
                         title = 'Untitled';
                     }
-
-                    console.log(`🔧 Auto-extracted title: "${title}" from content: "${firstLine}"`);
                 } else {
-                    // 保持现有标题不变
                     title = currentTitle;
                 }
             }

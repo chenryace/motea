@@ -8,12 +8,7 @@ export interface TreeStoreConfig {
     connectionString: string;
 }
 
-/**
- * Fix tree structure issues
- * 1. children 有可能包含 null，暂不清楚从哪产生的
- * 2. 可能会存在 children 包含当前节点的问题
- * 3. children 可能包含不存在的节点
- */
+
 function fixedTree(tree: TreeModel) {
     forEach(tree.items, (item) => {
         if (
@@ -42,7 +37,7 @@ export class TreeStorePostgreSQL {
         this.pool = new Pool({
             connectionString: config.connectionString,
             ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-            max: 1, // Vercel serverless functions work better with fewer connections
+            max: 1, 
             idleTimeoutMillis: 10000,
             connectionTimeoutMillis: 10000,
         });
@@ -57,7 +52,6 @@ export class TreeStorePostgreSQL {
             );
 
             if (result.rows.length === 0) {
-                // Initialize with default tree without recursive call
                 const defaultTree = fixedTree(DEFAULT_TREE);
                 await client.query(`
                     INSERT INTO tree_data (id, data, updated_at)
@@ -72,7 +66,6 @@ export class TreeStorePostgreSQL {
             return fixedTree(tree);
         } catch (error) {
             this.logger.error('Error getting tree:', error);
-            // Return default tree without saving to avoid infinite recursion
             return fixedTree(DEFAULT_TREE);
         } finally {
             client.release();

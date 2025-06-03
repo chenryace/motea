@@ -25,7 +25,7 @@ export async function getNote(
         id,
         content: content || '\n',
         ...jsonMeta,
-        updated_at, // 添加真实的更新时间
+        updated_at, 
     } as NoteModel;
 }
 
@@ -62,32 +62,25 @@ export default api()
         const notePath = getPathNoteById(id);
         const oldMeta = await req.state.store.getObjectMeta(notePath);
 
-        // 🔧 修复标题乱码：正确处理metadata更新
-        // 1. 解压缩旧的metadata
         const oldMetaJson = metaToJson(oldMeta);
 
-        // 2. 合并新的metadata（包括可能的标题更新）
         const updatedMetaJson = {
             ...oldMetaJson,
-            ...req.body, // 🔧 关键修复：合并请求中的新metadata（如标题）
+            ...req.body, 
             date: new Date().toISOString(),
         };
 
-        // 移除content字段，因为它不属于metadata
         delete updatedMetaJson.content;
 
-        // 3. 重新压缩
         const metaData = jsonToMeta(updatedMetaJson);
 
-        // 确保metadata中包含ID（用于PostgreSQL存储）
         const metaWithId = {
             ...metaData,
-            id: id, // 添加ID到metadata中
+            id: id, 
         };
 
         console.log('🔧 Notes API updating content for note with title:', updatedMetaJson.title);
 
-        // Empty content may be a misoperation
         if (!content || content.trim() === '\\') {
             await req.state.store.copyObject(notePath, notePath + '.bak', {
                 meta: metaWithId,
@@ -100,7 +93,6 @@ export default api()
             meta: metaWithId,
         });
 
-        // 🔧 修复：返回正确解压缩的数据
         const updatedNote = {
             id,
             content,

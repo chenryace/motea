@@ -34,10 +34,10 @@ export class StorePostgreSQL extends StoreProvider {
         this.pool = new Pool({
             connectionString: config.connectionString,
             ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-            max: 3, // 稍微增加连接数以提高并发性能
-            idleTimeoutMillis: 30000, // 增加空闲超时
-            connectionTimeoutMillis: 5000, // 减少连接超时
-            statement_timeout: 10000, // 添加语句超时
+            max: 3, 
+            idleTimeoutMillis: 30000, 
+            connectionTimeoutMillis: 5000,
+            statement_timeout: 10000, 
         });
     }
 
@@ -86,25 +86,19 @@ export class StorePostgreSQL extends StoreProvider {
 
     private async createPerformanceIndexes(client: any): Promise<void> {
         const indexes = [
-            // 基础查询索引
             'CREATE INDEX IF NOT EXISTS idx_notes_path ON notes(path)',
             'CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC)',
             'CREATE INDEX IF NOT EXISTS idx_notes_id ON notes(id)',
 
-            // 元数据查询索引（用于树结构和搜索）
             'CREATE INDEX IF NOT EXISTS idx_notes_metadata_gin ON notes USING GIN(metadata)',
 
-            // 特定元数据字段索引（提升常用查询性能）
             'CREATE INDEX IF NOT EXISTS idx_notes_metadata_pid ON notes((metadata->>\'pid\'))',
             'CREATE INDEX IF NOT EXISTS idx_notes_metadata_title ON notes((metadata->>\'title\'))',
 
-            // 每日笔记查询索引
             'CREATE INDEX IF NOT EXISTS idx_notes_daily ON notes((metadata->>\'isDailyNote\')) WHERE metadata->>\'isDailyNote\' = \'true\'',
 
-            // 内容搜索索引（全文搜索）
             'CREATE INDEX IF NOT EXISTS idx_notes_content_search ON notes USING GIN(to_tsvector(\'english\', COALESCE(content, \'\')))',
 
-            // 树结构查询索引
             'CREATE INDEX IF NOT EXISTS idx_tree_data_updated_at ON tree_data(updated_at DESC)',
         ];
 
@@ -114,15 +108,12 @@ export class StorePostgreSQL extends StoreProvider {
                 const indexName = indexQuery.match(/idx_\w+/)?.[0] || 'unknown';
                 this.logger.debug('Created/verified index:', indexName);
             } catch (error) {
-                // 索引可能已存在或有其他问题，记录但不中断初始化
                 this.logger.warn('Index creation warning:', error instanceof Error ? error.message : String(error));
             }
         }
     }
 
     async getSignUrl(_path: string, _expires = 600): Promise<string | null> {
-        // PostgreSQL doesn't support signed URLs like S3
-        // Return null to indicate this feature is not available
         return null;
     }
 
@@ -232,12 +223,9 @@ export class StorePostgreSQL extends StoreProvider {
         try {
             const content = Buffer.isBuffer(raw) ? raw.toString('utf-8') : raw;
             const fullPath = this.getPath(path);
-
-            // 检查是否是笔记路径（需要ID）还是其他数据（如设置，不需要ID）
             const isNotePath = path.startsWith('notes/');
 
             if (isNotePath) {
-                // 笔记数据：从metadata中提取ID
                 const metadata = options?.meta || {};
                 const noteId = metadata.id;
 
@@ -245,7 +233,6 @@ export class StorePostgreSQL extends StoreProvider {
                     throw new Error('Note ID is required in metadata for notes');
                 }
 
-                // 创建不包含ID的metadata副本
                 const metadataWithoutId = { ...metadata };
                 delete metadataWithoutId.id;
 
@@ -268,7 +255,6 @@ export class StorePostgreSQL extends StoreProvider {
 
                 this.logger.debug('Successfully put note:', fullPath, 'with ID:', noteId);
             } else {
-                // 非笔记数据（如设置）：使用路径作为ID
                 await client.query(`
                     INSERT INTO notes (id, path, content, content_type, metadata, updated_at)
                     VALUES ($1, $2, $3, $4, $5, NOW())
@@ -279,7 +265,7 @@ export class StorePostgreSQL extends StoreProvider {
                         metadata = EXCLUDED.metadata,
                         updated_at = NOW()
                 `, [
-                    fullPath, // 使用完整路径作为ID
+                    fullPath, 
                     fullPath,
                     content,
                     options?.contentType || 'text/markdown',
@@ -322,16 +308,13 @@ export class StorePostgreSQL extends StoreProvider {
             const fullFromPath = this.getPath(fromPath);
             const fullToPath = this.getPath(toPath);
 
-            // 从metadata中提取ID
             const metadata = options.meta || {};
             const noteId = metadata.id;
 
-            // 创建不包含ID的metadata副本
             const metadataWithoutId = { ...metadata };
             delete metadataWithoutId.id;
 
             if (fullFromPath === fullToPath) {
-                // Update metadata only
                 await client.query(`
                     UPDATE notes
                     SET metadata = $2, content_type = $3, updated_at = NOW()
@@ -375,7 +358,6 @@ export class StorePostgreSQL extends StoreProvider {
         }
     }
 
-    // Tree-specific methods
     async getTree(): Promise<any> {
         const client = await this.pool.connect();
         try {

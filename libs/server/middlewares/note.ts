@@ -16,12 +16,10 @@ export const applyNote: (id: string) => SSRMiddleware =
             pageMode: PageMode.NOTE,
         };
 
-        // todo 页面不存在时应该跳转到新建页
         if (!RESERVED_ROUTES.includes(id)) {
             try {
                 props.note = await getNote(req.state.store, id);
             } catch (e) {
-                // do nothing
             }
         }
 

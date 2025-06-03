@@ -20,7 +20,6 @@ const EditNotePage: NextPage<{ tree: TreeModel }> = ({ tree }) => {
 
     useEffect(() => {
         if (ua.isMobileOnly) {
-            // Generate new ID and navigate directly (using imported genId function)
             const newId = genId();
             Router.push(`/${newId}?new`)
                 ?.catch((v) => console.error('Error whilst pushing to new note: %O', v));

@@ -219,7 +219,6 @@ export function loadConfigAndListErrors(): {
             }
             if (auth.type === 'basic') {
                 if (auth.users) {
-                    // TEMPORARILY;
                     errors.push({
                         name: ErrTitle.INVALID_AUTH_CONFIG,
                         description: 'Multiple users are not yet supported',
@@ -235,10 +234,6 @@ export function loadConfigAndListErrors(): {
                         ],
                     });
 
-                    /*for (const user of auth.users) {
-                        user.username = user.username.toString();
-                        user.password = user.password.toString();
-                    }*/
                 } else {
                     auth.username = auth.username?.toString();
                     auth.password = auth.password.toString();
@@ -256,26 +251,21 @@ export function loadConfigAndListErrors(): {
     const supabaseUrl = env.getEnvRaw('SUPABASE_URL', false);
     const supabaseKey = env.getEnvRaw('SUPABASE_ANON_KEY', false);
 
-    // 检测数据库提供商
     let provider: 'self-hosted' | 'supabase' = 'self-hosted';
     let connectionString = postgresUrl || '';
     let ssl = false;
 
     if (supabaseUrl && supabaseKey) {
-        // Supabase 配置
         provider = 'supabase';
         connectionString = `postgresql://postgres:[YOUR-PASSWORD]@${supabaseUrl.replace('https://', '').replace('http://', '')}:5432/postgres`;
         ssl = true;
 
-        // 如果提供了完整的 DATABASE_URL，优先使用
         if (postgresUrl && postgresUrl.includes('supabase')) {
             connectionString = postgresUrl;
         }
     } else if (postgresUrl) {
-        // 自建 PostgreSQL
         provider = 'self-hosted';
         connectionString = postgresUrl;
-        // 检测是否需要 SSL
         ssl = postgresUrl.includes('sslmode=require') || postgresUrl.includes('ssl=true');
     }
 

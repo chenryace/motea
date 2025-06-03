@@ -16,11 +16,9 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
     ]);
 }
 
-// 为树结构添加笔记元数据
 async function enrichTreeWithMetadata(tree: TreeModel, store: StoreProvider): Promise<TreeModel> {
     const enrichedTree = { ...tree };
 
-    // 并行获取所有笔记的元数据
     const noteIds = Object.keys(tree.items).filter(id => id !== ROOT_ID);
     console.log(`📊 Enriching ${noteIds.length} notes with metadata...`);
 
@@ -30,14 +28,12 @@ async function enrichTreeWithMetadata(tree: TreeModel, store: StoreProvider): Pr
             if (meta) {
                 const jsonMeta = metaToJson(meta);
 
-                // 🔧 修复标题乱码：添加安全的标题处理
                 let safeTitle = '';
                 try {
                     safeTitle = jsonMeta.title || '';
-                    // 验证标题是否包含HTML标签（说明解压缩出错）
                     if (safeTitle.includes('<') && safeTitle.includes('>')) {
                         console.warn(`⚠️ Detected HTML in title for note ${noteId}, using fallback`);
-                        safeTitle = ''; // 重置为空，让前端重新提取
+                        safeTitle = ''; 
                     }
                 } catch (error) {
                     console.warn(`⚠️ Failed to process title for note ${noteId}:`, error);
@@ -65,7 +61,6 @@ async function enrichTreeWithMetadata(tree: TreeModel, store: StoreProvider): Pr
 
     const metadataResults = await Promise.all(metadataPromises);
 
-    // 将元数据添加到树结构中
     metadataResults.forEach(result => {
         if (result && enrichedTree.items[result.id]) {
             enrichedTree.items[result.id].data = result.metadata as any;
@@ -83,7 +78,6 @@ export default api()
         try {
             console.log('Getting tree data...');
 
-            // Add 8 second timeout (leaving 2 seconds buffer for Vercel's 10s limit)
             const tree = await withTimeout(
                 req.state.treeStore.get(),
                 8000
@@ -91,7 +85,6 @@ export default api()
 
             console.log('Tree data retrieved, enriching with note metadata...');
 
-            // 为树结构添加笔记元数据
             const enrichedTree = await enrichTreeWithMetadata(tree, req.state.store);
 
             console.log('Tree data enriched, cleaning...');

@@ -31,7 +31,6 @@ export interface MovePosition {
 }
 
 function addItem(tree: TreeModel, id: string, pid = ROOT_ID) {
-    // 创建树的深拷贝以避免直接修改原对象
     const newTree = cloneDeep(tree);
 
     newTree.items[id] = newTree.items[id] || {
@@ -42,7 +41,6 @@ function addItem(tree: TreeModel, id: string, pid = ROOT_ID) {
     const parentItem = newTree.items[pid];
 
     if (parentItem) {
-        // 确保不重复添加
         if (!parentItem.children.includes(id)) {
             parentItem.children = [...parentItem.children, id];
         }

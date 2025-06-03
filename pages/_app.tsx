@@ -18,11 +18,9 @@ import { SnackbarProvider } from 'notistack';
 import { createTheme } from '@material-ui/core/styles';
 
 const handleRejection = (event: any) => {
-    // react-beautiful-dnd 会捕获到 `ResizeObserver loop limit exceeded`
-    // 但实际这个错误对性能没有影响
-    // see https://github.com/atlassian/react-beautiful-dnd/issues/1548
+
     if (/^ResizeObserver/.test(event.message)) {
-        // todo catch
+
         event.stopImmediatePropagation();
     }
     if (event.reason === 'canceled') {
@@ -66,11 +64,6 @@ const AppInner = ({
                     palette: {
                         type: resolvedTheme === 'dark' ? 'dark' : 'light',
                         primary: {
-                            /**
-                             * colors https://tailwindcss.com/docs/customizing-colors
-                             * primary.main: blue 500
-                             * secondary.main: gray 500
-                             */
                             main: '#3B82F6',
                         },
                         secondary: {
@@ -84,7 +77,6 @@ const AppInner = ({
     );
 
     useEffect(() => {
-        // Remove the server-side injected CSS.
         const jssStyles = document.querySelector('#jss-server-side');
 
         if (jssStyles) {

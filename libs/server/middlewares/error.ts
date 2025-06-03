@@ -82,11 +82,6 @@ export async function onError(
     res.status?.(e.status).json?.(e);
 }
 
-/**
- * FIXME:
- * I don't know why it breaks in getServerSideProps without `next()`.
- * This should be fixed, then use onError instead.
- */
 export async function onErrorWithNext(
     err: Error & APIError,
     _req: ApiRequest,

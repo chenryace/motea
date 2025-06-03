@@ -74,16 +74,13 @@ export default DebugPage;
 export const getServerSideProps = async (ctx: SSRContext) => {
     await ssr().use(applyMisconfiguration).run(ctx.req, ctx.res);
 
-    // has to be cast to non-null
+
     const debugInformation = ctx.req.props.debugInformation as DebugInformation;
 
 
     const envAllowDebug = env.parseBool(env.getEnvRaw('ALLOW_DEBUG'), false);
 
     let redirect;
-    // It's only allowed if ALLOW_DEBUG is true or if a fatal error was registered
-    // Note that it doesn't work well with Vercel due to the serverless architecture
-    // but some errors can still be detected
     if (!envAllowDebug && !debugInformation.issues.some((v) => v.severity === IssueSeverity.FATAL_ERROR)) {
         redirect = {
             destination: '/',
