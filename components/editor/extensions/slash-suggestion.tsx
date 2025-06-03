@@ -57,6 +57,12 @@ const commands = [
         },
     },
     {
+        title: 'Task List',
+        command: ({ editor, range }: any) => {
+            editor.chain().focus().deleteRange(range).toggleTaskList().run();
+        },
+    },
+    {
         title: 'Quote',
         command: ({ editor, range }: any) => {
             editor.chain().focus().deleteRange(range).setParagraph().toggleBlockquote().run();

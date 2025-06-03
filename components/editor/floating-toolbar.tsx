@@ -1,3 +1,14 @@
+/**
+ * Floating Toolbar Component
+ * Based on the open-source project Notea, originally created by qingwei-li<cinwell.li@gmail.com>.
+ * Modified and maintained by waycaan, 2025.
+ *
+ * Key modifications:
+ * - Added Task List (checkbox) functionality
+ * - Enhanced styling and responsiveness
+ * - Added more formatting options
+ */
+
 import React, { useEffect, useState } from 'react';
 import { Editor } from '@tiptap/react';
 import { useTheme } from 'next-themes';
@@ -117,6 +128,12 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
             action: () => editor.chain().focus().toggleOrderedList().run(),
             isActive: editor.isActive('orderedList'),
             title: 'Numbered List'
+        },
+        {
+            icon: '☐',
+            action: () => editor.chain().focus().toggleTaskList().run(),
+            isActive: editor.isActive('taskList'),
+            title: 'Task List (Checkbox)'
         },
         {
             icon: '🔗',

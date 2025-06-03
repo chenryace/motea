@@ -22,6 +22,8 @@ import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 import Highlight from './extensions/highlight';
 import { use100vh } from 'react-div-100vh';
 import useMounted from 'libs/web/hooks/use-mounted';
@@ -92,6 +94,13 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
             Underline,
             Highlight.configure({
                 multicolor: false,
+            }),
+            TaskList,
+            TaskItem.configure({
+                nested: true,
+                HTMLAttributes: {
+                    class: 'task-item',
+                },
             }),
             MarkdownExtension,
             SlashCommands.configure({
@@ -354,6 +363,64 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
 
                 .ProseMirror u {
                     text-decoration: underline;
+                }
+
+                /* Task List Styles */
+                .ProseMirror ul[data-type="taskList"] {
+                    list-style: none;
+                    padding-left: 0;
+                    margin: 1rem 0;
+                }
+
+                .ProseMirror ul[data-type="taskList"] li {
+                    display: flex;
+                    align-items: center;
+                    margin: 0.25rem 0;
+                    padding-left: 0;
+                    line-height: 1.7;
+                    min-height: auto;
+                }
+
+                .ProseMirror ul[data-type="taskList"] li::before {
+                    display: none;
+                }
+
+                .ProseMirror ul[data-type="taskList"] li > label {
+                    flex-shrink: 0;
+                    margin-right: 0.5rem;
+                    margin-top: 0;
+                    user-select: none;
+                    display: flex;
+                    align-items: center;
+                    line-height: 1;
+                }
+
+                .ProseMirror ul[data-type="taskList"] li > div {
+                    flex: 1;
+                    line-height: 1.7;
+                }
+
+                .ProseMirror ul[data-type="taskList"] li > div > p {
+                    margin: 0;
+                    line-height: 1.7;
+                }
+
+                .ProseMirror ul[data-type="taskList"] li input[type="checkbox"] {
+                    width: 1rem;
+                    height: 1rem;
+                    cursor: pointer;
+                    accent-color: #3b82f6;
+                    margin: 0;
+                    vertical-align: middle;
+                }
+
+                .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+                    text-decoration: line-through;
+                    color: #6b7280;
+                }
+
+                .dark .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+                    color: #9ca3af;
                 }
             `}</style>
         </div>
