@@ -274,6 +274,89 @@ export const MarkdownExtension = Extension.create({
         ];
     },
 
+    addProseMirrorPlugins() {
+        return [
+            new (require('prosemirror-state').Plugin)({
+                key: new (require('prosemirror-state').PluginKey)('headingInputHandler'),
+                props: {
+                    handleTextInput: (view: any, from: number, to: number, text: string) => {
+                        // 检查是否是空格输入
+                        if (text === ' ') {
+                            const { state } = view;
+                            const { $from } = state.selection;
+                            const textBefore = $from.parent.textContent.slice(0, $from.parentOffset);
+
+                            console.log('Text input detected:', { text, textBefore, from, to });
+
+                            // 检查各级标题
+                            const headingMatches = [
+                                { pattern: /^######$/, level: 6 },
+                                { pattern: /^#####$/, level: 5 },
+                                { pattern: /^####$/, level: 4 },
+                                { pattern: /^###$/, level: 3 },
+                                { pattern: /^##$/, level: 2 },
+                                { pattern: /^#$/, level: 1 },
+                            ];
+
+                            for (const { pattern, level } of headingMatches) {
+                                if (pattern.test(textBefore)) {
+                                    console.log(`H${level} heading detected via text input:`, textBefore);
+
+                                    // 删除原文本并设置为标题
+                                    const tr = state.tr
+                                        .delete($from.start(), $from.pos)
+                                        .setBlockType($from.start(), $from.start(), state.schema.nodes.heading, { level });
+
+                                    view.dispatch(tr);
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    },
+
+                    handleDOMEvents: {
+                        compositionend: (view: any, event: CompositionEvent) => {
+                            // 处理中文输入法结束事件
+                            setTimeout(() => {
+                                const { state } = view;
+                                const { $from } = state.selection;
+                                const textBefore = $from.parent.textContent.slice(0, $from.parentOffset);
+
+                                console.log('Composition ended:', { data: event.data, textBefore });
+
+                                // 检查是否以空格结尾的标题模式
+                                const headingMatches = [
+                                    { pattern: /^###### $/, level: 6 },
+                                    { pattern: /^##### $/, level: 5 },
+                                    { pattern: /^#### $/, level: 4 },
+                                    { pattern: /^### $/, level: 3 },
+                                    { pattern: /^## $/, level: 2 },
+                                    { pattern: /^# $/, level: 1 },
+                                ];
+
+                                for (const { pattern, level } of headingMatches) {
+                                    if (pattern.test(textBefore)) {
+                                        console.log(`H${level} heading detected via composition:`, textBefore);
+
+                                        // 删除原文本并设置为标题
+                                        const tr = state.tr
+                                            .delete($from.start(), $from.pos)
+                                            .setBlockType($from.start(), $from.start(), state.schema.nodes.heading, { level });
+
+                                        view.dispatch(tr);
+                                        return true;
+                                    }
+                                }
+                            }, 0);
+                            return false;
+                        }
+                    }
+                }
+            })
+        ];
+    },
+
     addKeyboardShortcuts() {
         return {
             'Mod-s': () => {
