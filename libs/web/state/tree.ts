@@ -364,7 +364,6 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
             id: ROOT_ID,
             children: pinnedIds,
             isExpanded: true,
-            hasChildren: pinnedIds.length > 0,
         };
 
         return {
