@@ -29,7 +29,7 @@ import { use100vh } from 'react-div-100vh';
 import useMounted from 'libs/web/hooks/use-mounted';
 import { useToast } from 'libs/web/hooks/use-toast';
 import useI18n from 'libs/web/hooks/use-i18n';
-import MarkdownExtension from './extensions/markdown';
+import MarkdownExtension, { CustomHeading } from './extensions/markdown';
 import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
@@ -68,12 +68,13 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
         immediatelyRender: false,
         extensions: [
             StarterKit.configure({
-                heading: {
-                    levels: [1, 2, 3, 4, 5, 6],
-                },
+                heading: false, // 禁用默认heading，使用我们自定义的
                 codeBlock: {
                     languageClassPrefix: 'language-',
                 },
+            }),
+            CustomHeading.configure({
+                levels: [1, 2, 3, 4, 5, 6],
             }),
             Link.configure({
                 openOnClick: false,
@@ -241,6 +242,27 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1.2rem 0 0.6rem 0;
                     line-height: 1.4;
+                }
+
+                .ProseMirror h4 {
+                    font-size: 1.5em;
+                    font-weight: bold;
+                    margin: 1.1rem 0 0.5rem 0;
+                    line-height: 1.4;
+                }
+
+                .ProseMirror h5 {
+                    font-size: 1.3em;
+                    font-weight: bold;
+                    margin: 1rem 0 0.4rem 0;
+                    line-height: 1.5;
+                }
+
+                .ProseMirror h6 {
+                    font-size: 1.1em;
+                    font-weight: bold;
+                    margin: 0.9rem 0 0.3rem 0;
+                    line-height: 1.5;
                 }
 
                 .ProseMirror ul {

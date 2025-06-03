@@ -15,8 +15,8 @@
  * copies or substantial portions of the Software.
  */
 
-import { Extension } from '@tiptap/core';
-import { textblockTypeInputRule } from '@tiptap/core';
+import { Extension, Node } from '@tiptap/core';
+import { textblockTypeInputRule, mergeAttributes } from '@tiptap/core';
 
 class MarkdownTransformer {
     serialize(doc: any): string {
@@ -137,6 +137,61 @@ class MarkdownTransformer {
         }).join('\n');
     }
 }
+
+// 自定义Heading节点
+export const CustomHeading = Node.create({
+    name: 'heading',
+
+    addOptions() {
+        return {
+            levels: [1, 2, 3, 4, 5, 6],
+            HTMLAttributes: {},
+        };
+    },
+
+    content: 'inline*',
+    group: 'block',
+    defining: true,
+
+    addAttributes() {
+        return {
+            level: {
+                default: 1,
+                rendered: false,
+            },
+        };
+    },
+
+    parseHTML() {
+        return this.options.levels.map((level: number) => ({
+            tag: `h${level}`,
+            attrs: { level },
+        }));
+    },
+
+    renderHTML({ node, HTMLAttributes }) {
+        const hasLevel = this.options.levels.includes(node.attrs.level);
+        const level = hasLevel ? node.attrs.level : this.options.levels[0];
+        return [`h${level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+    },
+
+    addCommands() {
+        return {
+            setHeading: (attributes: any) => ({ commands }: any) => {
+                if (!this.options.levels.includes(attributes.level)) {
+                    return false;
+                }
+                return commands.setNode(this.name, attributes);
+            },
+            toggleHeading: (attributes: any) => ({ commands }: any) => {
+                if (!this.options.levels.includes(attributes.level)) {
+                    return false;
+                }
+                return commands.toggleNode(this.name, 'paragraph', attributes);
+            },
+        };
+    },
+});
 
 export const MarkdownExtension = Extension.create({
     name: 'markdown',
