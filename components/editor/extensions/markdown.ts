@@ -16,6 +16,7 @@
  */
 
 import { Extension } from '@tiptap/core';
+import { textblockTypeInputRule } from '@tiptap/core';
 
 class MarkdownTransformer {
     serialize(doc: any): string {
@@ -139,6 +140,7 @@ class MarkdownTransformer {
 
 export const MarkdownExtension = Extension.create({
     name: 'markdown',
+    priority: 1000, // 高优先级确保输入规则优先执行
 
     addStorage() {
         return {
@@ -156,6 +158,65 @@ export const MarkdownExtension = Extension.create({
                 return this.storage.transformer.serialize(editor.state.doc);
             },
         } as any;
+    },
+
+    addInputRules() {
+        return [
+            // H1 标题输入规则 - 更精确的匹配
+            textblockTypeInputRule({
+                find: /^(#)\s$/,
+                type: this.editor.schema.nodes.heading,
+                getAttributes: (match) => {
+                    console.log('H1 heading rule triggered:', match);
+                    return { level: 1 };
+                },
+            }),
+            // H2 标题输入规则
+            textblockTypeInputRule({
+                find: /^(##)\s$/,
+                type: this.editor.schema.nodes.heading,
+                getAttributes: (match) => {
+                    console.log('H2 heading rule triggered:', match);
+                    return { level: 2 };
+                },
+            }),
+            // H3 标题输入规则
+            textblockTypeInputRule({
+                find: /^(###)\s$/,
+                type: this.editor.schema.nodes.heading,
+                getAttributes: (match) => {
+                    console.log('H3 heading rule triggered:', match);
+                    return { level: 3 };
+                },
+            }),
+            // H4 标题输入规则
+            textblockTypeInputRule({
+                find: /^(####)\s$/,
+                type: this.editor.schema.nodes.heading,
+                getAttributes: (match) => {
+                    console.log('H4 heading rule triggered:', match);
+                    return { level: 4 };
+                },
+            }),
+            // H5 标题输入规则
+            textblockTypeInputRule({
+                find: /^(#####)\s$/,
+                type: this.editor.schema.nodes.heading,
+                getAttributes: (match) => {
+                    console.log('H5 heading rule triggered:', match);
+                    return { level: 5 };
+                },
+            }),
+            // H6 标题输入规则
+            textblockTypeInputRule({
+                find: /^(######)\s$/,
+                type: this.editor.schema.nodes.heading,
+                getAttributes: (match) => {
+                    console.log('H6 heading rule triggered:', match);
+                    return { level: 6 };
+                },
+            }),
+        ];
     },
 
     addKeyboardShortcuts() {
