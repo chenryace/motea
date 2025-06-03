@@ -64,7 +64,7 @@ const TiptapMainEditor: FC<
     }
 
     const articleClassName =
-        className || `pt-16 md:pt-40 px-6 m-auto h-full ${editorWidthClass}`;
+        className || `pt-24 md:pt-40 px-6 m-auto h-full ${editorWidthClass}`;
 
     return (
         <article className={articleClassName}>

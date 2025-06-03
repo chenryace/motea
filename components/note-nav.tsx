@@ -76,19 +76,55 @@ const NoteNav = () => {
         showItem(note);
     }, [note, showItem]);
 
+    // 手机端渲染
+    if (ua.isMobileOnly) {
+        return (
+            <nav
+                className="fixed bg-gray-50 z-10 p-2 right-0 shadow"
+                style={{ width: '100%' }}
+            >
+                {/* 第一行：菜单按钮 + 标题 */}
+                <div className="flex items-center mb-1">
+                    <MenuButton />
+                    <div className="flex-auto ml-2">
+                        {note && (
+                            <Tooltip title={note.title}>
+                                <span className="text-gray-600 text-sm truncate select-none block">
+                                    {note.title}
+                                </span>
+                            </Tooltip>
+                        )}
+                    </div>
+                </div>
+
+                {/* 第二行：上传时间 */}
+                <div className="flex items-center mb-1 ml-10">
+                    {note && <UpdatedAtDisplay className="text-xs text-gray-400" />}
+                </div>
+
+                {/* 第三行：SaveButton */}
+                <div className="flex items-center ml-10">
+                    <div
+                        className={classNames(
+                            'flex mr-2 transition-opacity delay-100',
+                            {
+                                'opacity-0': !loading,
+                            }
+                        )}
+                    >
+                        <CircularProgress size="14px" color="inherit" />
+                    </div>
+                    <SaveButton />
+                </div>
+            </nav>
+        );
+    }
+
+    // 桌面端渲染（保持原有布局）
     return (
         <nav
-            className={classNames(
-                'fixed bg-gray-50 z-10 p-2 flex items-center right-0',
-                {
-                    shadow: ua.isMobileOnly,
-                }
-            )}
-            style={{
-                width: ua.isMobileOnly ? '100%' : 'inherit',
-            }}
+            className="fixed bg-gray-50 z-10 p-2 flex items-center right-0"
         >
-            {ua.isMobileOnly ? <MenuButton /> : null}
             <NavButtonGroup />
             <div className="flex-auto ml-4">
                 {note && (
