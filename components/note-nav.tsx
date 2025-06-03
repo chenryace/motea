@@ -79,9 +79,9 @@ const NoteNav = () => {
     return (
         <nav
             className={classNames(
-                'fixed bg-gray-50 z-10 right-0',
-                'lg:flex lg:items-center lg:h-auto lg:p-2',
-                'max-lg:block max-lg:h-auto max-lg:py-6 max-lg:px-2',
+                'fixed bg-gray-50 z-10 right-0 flex',
+                'lg:items-center lg:h-auto lg:p-2',
+                'max-lg:flex-col max-lg:items-start max-lg:py-6 max-lg:px-2',
                 {
                     shadow: ua.isMobileOnly,
                 }
@@ -151,7 +151,7 @@ const NoteNav = () => {
             </div>
 
             {/* 按钮区域 */}
-            <div className="flex items-center">
+            <div className="flex items-center max-lg:mt-2">
                 <div
                     className={classNames(
                         'flex mr-2 transition-opacity delay-100',
