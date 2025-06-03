@@ -1,4 +1,4 @@
-import pkg from 'package.json';
+import pkg from 'package.json';More actions
 
 export const SettingFooter = () => {
     return (
@@ -19,9 +19,9 @@ export const SettingFooter = () => {
                     target="_blank"
                     rel="noreferrer"
                 >
-                    Notea.org, 2022,created by qingwei-li<cinwell.li@gmail.com>, Modified and maintained by waycaan, 2025.
+                    Notea Contributors
                 </a>
-                <span>2022</span>
+                <span> -Enhanced by waycaan 2025-</span>
             </div>
         </footer>
     );
