@@ -76,57 +76,28 @@ const NoteNav = () => {
         showItem(note);
     }, [note, showItem]);
 
-    // 手机端渲染
-    if (ua.isMobileOnly) {
-        return (
-            <nav
-                className="fixed bg-gray-50 z-10 p-2 right-0 shadow"
-                style={{ width: '100%' }}
-            >
-                {/* 第一行：菜单按钮 + 标题 */}
-                <div className="flex items-center mb-1">
-                    <MenuButton />
-                    <div className="flex-auto ml-2">
-                        {note && (
-                            <Tooltip title={note.title}>
-                                <span className="text-gray-600 text-sm truncate select-none block">
-                                    {note.title}
-                                </span>
-                            </Tooltip>
-                        )}
-                    </div>
-                </div>
-
-                {/* 第二行：上传时间 */}
-                <div className="flex items-center mb-1 ml-10">
-                    {note && <UpdatedAtDisplay className="text-xs text-gray-400" />}
-                </div>
-
-                {/* 第三行：SaveButton */}
-                <div className="flex items-center ml-10">
-                    <div
-                        className={classNames(
-                            'flex mr-2 transition-opacity delay-100',
-                            {
-                                'opacity-0': !loading,
-                            }
-                        )}
-                    >
-                        <CircularProgress size="14px" color="inherit" />
-                    </div>
-                    <SaveButton />
-                </div>
-            </nav>
-        );
-    }
-
-    // 桌面端渲染（保持原有布局）
     return (
         <nav
-            className="fixed bg-gray-50 z-10 p-2 flex items-center right-0"
+            className={classNames(
+                'fixed bg-gray-50 z-10 right-0',
+                'lg:flex lg:items-center lg:h-auto lg:p-2',
+                'max-lg:block max-lg:h-auto max-lg:py-6 max-lg:px-2',
+                {
+                    shadow: ua.isMobileOnly,
+                }
+            )}
+            style={{
+                width: ua.isMobileOnly ? '100%' : 'inherit',
+            }}
         >
-            <NavButtonGroup />
-            <div className="flex-auto ml-4">
+            {ua.isMobileOnly ? <MenuButton /> : null}
+
+            {/* 导航箭头 - 在窄屏时隐藏 */}
+            <div className="hidden lg:block">
+                <NavButtonGroup />
+            </div>
+
+            <div className="flex-auto lg:ml-4 max-lg:mb-2">
                 {note && (
                     <Breadcrumbs
                         maxItems={2}
@@ -178,43 +149,56 @@ const NoteNav = () => {
                     `}
                 </style>
             </div>
-            <div
-                className={classNames(
-                    'flex mr-2 transition-opacity delay-100',
-                    {
-                        'opacity-0': !loading,
-                    }
-                )}
-            >
-                <CircularProgress size="14px" color="inherit" />
-            </div>
-            <SaveButton className="mr-2" />
-            <HotkeyTooltip text={t('Share page')}>
-                <IconButton
-                    onClick={handleClickShare}
-                    className="mr-2"
-                    disabled={!note}
-                    iconClassName={classNames({
-                        'text-blue-500': note?.shared === NOTE_SHARED.PUBLIC,
-                    })}
-                    icon="Share"
-                />
-            </HotkeyTooltip>
-            <HotkeyTooltip text={t('Editor width')}>
-                <IconButton
-                    icon="WidthSize"
-                    className="mr-2"
-                    onClick={handleClickEditorWidth}
+
+            {/* 按钮区域 */}
+            <div className="flex items-center">
+                <div
+                    className={classNames(
+                        'flex mr-2 transition-opacity delay-100',
+                        {
+                            'opacity-0': !loading,
+                        }
+                    )}
                 >
-                </IconButton>
-            </HotkeyTooltip>
-            <HotkeyTooltip text={t('Settings')}>
-                <IconButton
-                    disabled={!note}
-                    onClick={handleClickMenu}
-                    icon="DotsHorizontal"
-                />
-            </HotkeyTooltip>
+                    <CircularProgress size="14px" color="inherit" />
+                </div>
+                <SaveButton className="mr-2" />
+
+                {/* Share按钮 - 在窄屏时隐藏 */}
+                <div className="hidden lg:block">
+                    <HotkeyTooltip text={t('Share page')}>
+                        <IconButton
+                            onClick={handleClickShare}
+                            className="mr-2"
+                            disabled={!note}
+                            iconClassName={classNames({
+                                'text-blue-500': note?.shared === NOTE_SHARED.PUBLIC,
+                            })}
+                            icon="Share"
+                        />
+                    </HotkeyTooltip>
+                </div>
+
+                {/* 宽度调节按钮 - 在窄屏时隐藏 */}
+                <div className="hidden lg:block">
+                    <HotkeyTooltip text={t('Editor width')}>
+                        <IconButton
+                            icon="WidthSize"
+                            className="mr-2"
+                            onClick={handleClickEditorWidth}
+                        >
+                        </IconButton>
+                    </HotkeyTooltip>
+                </div>
+
+                <HotkeyTooltip text={t('Settings')}>
+                    <IconButton
+                        disabled={!note}
+                        onClick={handleClickMenu}
+                        icon="DotsHorizontal"
+                    />
+                </HotkeyTooltip>
+            </div>
         </nav>
     );
 };

@@ -16,6 +16,7 @@ module.exports = {
         },
         screens: {
             md: '768px',
+            lg: '960px', // 半屏断点
         },
         extend: {
             cursor: {
