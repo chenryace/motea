@@ -138,7 +138,6 @@ class MarkdownTransformer {
     }
 }
 
-// 自定义Heading节点
 export const CustomHeading = Node.create({
     name: 'heading',
 
@@ -195,7 +194,7 @@ export const CustomHeading = Node.create({
 
 export const MarkdownExtension = Extension.create({
     name: 'markdown',
-    priority: 1000, // 高优先级确保输入规则优先执行
+    priority: 1000, 
 
     addStorage() {
         return {
@@ -217,59 +216,35 @@ export const MarkdownExtension = Extension.create({
 
     addInputRules() {
         return [
-            // H1 标题输入规则 - 更精确的匹配
             textblockTypeInputRule({
                 find: /^(#)\s$/,
                 type: this.editor.schema.nodes.heading,
-                getAttributes: (match) => {
-                    console.log('H1 heading rule triggered:', match);
-                    return { level: 1 };
-                },
+                getAttributes: () => ({ level: 1 }),
             }),
-            // H2 标题输入规则
             textblockTypeInputRule({
                 find: /^(##)\s$/,
                 type: this.editor.schema.nodes.heading,
-                getAttributes: (match) => {
-                    console.log('H2 heading rule triggered:', match);
-                    return { level: 2 };
-                },
+                getAttributes: () => ({ level: 2 }),
             }),
-            // H3 标题输入规则
             textblockTypeInputRule({
                 find: /^(###)\s$/,
                 type: this.editor.schema.nodes.heading,
-                getAttributes: (match) => {
-                    console.log('H3 heading rule triggered:', match);
-                    return { level: 3 };
-                },
+                getAttributes: () => ({ level: 3 }),
             }),
-            // H4 标题输入规则
             textblockTypeInputRule({
                 find: /^(####)\s$/,
                 type: this.editor.schema.nodes.heading,
-                getAttributes: (match) => {
-                    console.log('H4 heading rule triggered:', match);
-                    return { level: 4 };
-                },
+                getAttributes: () => ({ level: 4 }),
             }),
-            // H5 标题输入规则
             textblockTypeInputRule({
                 find: /^(#####)\s$/,
                 type: this.editor.schema.nodes.heading,
-                getAttributes: (match) => {
-                    console.log('H5 heading rule triggered:', match);
-                    return { level: 5 };
-                },
+                getAttributes: () => ({ level: 5 }),
             }),
-            // H6 标题输入规则
             textblockTypeInputRule({
                 find: /^(######)\s$/,
                 type: this.editor.schema.nodes.heading,
-                getAttributes: (match) => {
-                    console.log('H6 heading rule triggered:', match);
-                    return { level: 6 };
-                },
+                getAttributes: () => ({ level: 6 }),
             }),
         ];
     },
@@ -280,15 +255,11 @@ export const MarkdownExtension = Extension.create({
                 key: new (require('prosemirror-state').PluginKey)('headingInputHandler'),
                 props: {
                     handleTextInput: (view: any, from: number, to: number, text: string) => {
-                        // 使用延迟检查，确保在所有输入事件完成后再检查
                         setTimeout(() => {
                             const { state } = view;
                             const { $from } = state.selection;
                             const textBefore = $from.parent.textContent.slice(0, $from.parentOffset);
 
-                            console.log('Text input detected (delayed check):', { text, textBefore, from, to });
-
-                            // 检查是否以空格结尾的标题模式
                             const headingMatches = [
                                 { pattern: /^###### $/, level: 6 },
                                 { pattern: /^##### $/, level: 5 },
@@ -300,9 +271,6 @@ export const MarkdownExtension = Extension.create({
 
                             for (const { pattern, level } of headingMatches) {
                                 if (pattern.test(textBefore)) {
-                                    console.log(`H${level} heading detected via delayed text input:`, textBefore);
-
-                                    // 删除原文本并设置为标题
                                     const tr = state.tr
                                         .delete($from.start(), $from.pos)
                                         .setBlockType($from.start(), $from.start(), state.schema.nodes.heading, { level });
@@ -311,13 +279,10 @@ export const MarkdownExtension = Extension.create({
                                     break;
                                 }
                             }
-                        }, 10); // 短暂延迟确保输入完成
+                        }, 10); 
 
-                        return false; // 不阻止原始输入
+                        return false; 
                     },
-
-                    // 移除 handleDOMEvents 以避免干扰正常的中文输入
-                    // 只依赖 handleTextInput 来处理标题转换
                 }
             })
         ];
