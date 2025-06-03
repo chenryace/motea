@@ -126,7 +126,7 @@ const NoteNav = () => {
                                     {note.title}
                                 </span>
                             </Tooltip>
-                            <UpdatedAtDisplay className="inline-block ml-2" />
+                            <UpdatedAtDisplay className="inline-block ml-2 hidden lg:inline-block" />
                             {!checkItemIsShown(note) && (
                                 <Tooltip title={t('Show note in tree')}>
                                     <span>
@@ -145,6 +145,12 @@ const NoteNav = () => {
                     {`
                         .title {
                             max-width: 120px;
+                        }
+
+                        @media (max-width: 959px) {
+                            .title {
+                                max-width: 10ch; /* 10个字符宽度 */
+                            }
                         }
                     `}
                 </style>
