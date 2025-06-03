@@ -21,6 +21,8 @@ export const DEFAULT_TREE: TreeModel = {
         root: {
             id: ROOT_ID,
             children: [],
+            isExpanded: true,
+            hasChildren: false,
         },
     },
 };
@@ -36,6 +38,8 @@ function addItem(tree: TreeModel, id: string, pid = ROOT_ID) {
     newTree.items[id] = newTree.items[id] || {
         id,
         children: [],
+        isExpanded: false,
+        hasChildren: false,
     };
 
     const parentItem = newTree.items[pid];
@@ -43,6 +47,8 @@ function addItem(tree: TreeModel, id: string, pid = ROOT_ID) {
     if (parentItem) {
         if (!parentItem.children.includes(id)) {
             parentItem.children = [...parentItem.children, id];
+            // Update parent's hasChildren property
+            parentItem.hasChildren = parentItem.children.length > 0;
         }
     } else {
         throw new Error(`Parent ID '${pid}' does not refer to a valid item`);
@@ -63,14 +69,18 @@ function mutateItem(tree: TreeModel, id: string, data: Partial<TreeItemModel>) {
 }
 
 function removeItem(tree: TreeModel, id: string) {
-    forEach(tree.items, (item) => {
+    const newTree = cloneDeep(tree);
+
+    forEach(newTree.items, (item) => {
         if (item.children.includes(id)) {
             pull(item.children, id);
+            // Update parent's hasChildren property
+            item.hasChildren = item.children.length > 0;
             return false;
         }
     });
 
-    return cloneDeep(tree);
+    return newTree;
 }
 
 function moveItem(
