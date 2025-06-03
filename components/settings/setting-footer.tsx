@@ -19,7 +19,7 @@ export const SettingFooter = () => {
                     target="_blank"
                     rel="noreferrer"
                 >
-                    Notea Contributors
+                    Notea.org, 2022,created by qingwei-li<cinwell.li@gmail.com>, Modified and maintained by waycaan, 2025.
                 </a>
                 <span>2022</span>
             </div>
