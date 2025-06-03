@@ -1,3 +1,14 @@
+/**
+ * Server Configuration
+ * Based on the open-source project Notea, originally created by qingwei-li<cinwell.li@gmail.com>.
+ * Modified and maintained by waycaan, 2025.
+ *
+ * Key modifications:
+ * - Replaced S3 storage configuration with PostgreSQL
+ * - Added support for multiple PostgreSQL providers (Neon, Supabase, self-hosted)
+ * - Enhanced error handling and validation for database connections
+ */
+
 import yaml from 'js-yaml';
 import * as env from 'libs/shared/env';
 import { existsSync, readFileSync } from 'fs';

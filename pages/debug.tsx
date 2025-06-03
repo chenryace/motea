@@ -1,3 +1,9 @@
+/**
+ * Debug Page
+ * Based on the open-source project Notea, originally created by qingwei-li<cinwell.li@gmail.com>.
+ * Modified and maintained by waycaan, 2025.
+ */
+
 import { ServerProps, ssr, SSRContext } from 'libs/server/connect';
 import { applyMisconfiguration } from 'libs/server/middlewares/misconfiguration';
 import pkg from 'package.json';
