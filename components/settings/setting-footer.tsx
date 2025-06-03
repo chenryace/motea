@@ -1,4 +1,5 @@
-import pkg from 'package.json';More actions
+import React from 'react';
+import pkg from 'package.json';
 
 export const SettingFooter = () => {
     return (
