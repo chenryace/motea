@@ -11,7 +11,6 @@ import useAutoSaveOnLeave from 'libs/web/hooks/use-auto-save-on-leave';
 import noteCache from 'libs/web/cache/note';
 import NoteNav from 'components/note-nav';
 import DeleteAlert from 'components/editor/delete-alert';
-// import { genNewId } from 'libs/shared/id';
 
 const TiptapEditContainer: FC = () => {
     const router = useRouter();
@@ -24,7 +23,6 @@ const TiptapEditContainer: FC = () => {
     } = UIState.useContainer();
     const toast = useToast();
 
-    // 启用自动保存功能
     useAutoSaveOnLeave({
         enabled: true,
     });
@@ -34,27 +32,23 @@ const TiptapEditContainer: FC = () => {
             if (!id || Array.isArray(id)) return;
 
             if (isNew) {
-                // 检查是否是每日笔记（通过daily参数）
                 const dailyDate = router.query.daily as string;
 
                 if (dailyDate && /^\d{4}-\d{1,2}-\d{1,2}$/.test(dailyDate)) {
-                    // 这是每日笔记，使用日期作为标题，并添加特殊标记
                     initNote({
                         id,
                         title: dailyDate,
                         content: '\n',
                         pid: settings.daily_root_id,
-                        isDailyNote: true, // 添加每日笔记标记
+                        isDailyNote: true, 
                     });
                 } else {
-                    // 普通新笔记逻辑
                     const cachedNote = await noteCache.getItem(id);
                     if (cachedNote) {
                         initNote(cachedNote);
                         return;
                     }
 
-                    // 借鉴旧项目：直接初始化本地笔记，简单有效
                     initNote({
                         id,
                         title: '',
@@ -63,16 +57,12 @@ const TiptapEditContainer: FC = () => {
                     });
                 }
             } else {
-                // 现有笔记逻辑 - 优先使用按需加载（支持缓存验证）
                 try {
-                    // 首先尝试按需加载（会检查缓存和树结构中的updated_at）
                     const noteData = await loadNoteOnDemand(id);
 
                     if (noteData) {
-                        // 按需加载成功，初始化编辑器
                         initNote(noteData);
                     } else {
-                        // 按需加载失败，回退到直接API调用
                         console.log('🔄 Fallback to direct API call for note:', id);
                         await fetchNote(id);
                     }

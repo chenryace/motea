@@ -2,7 +2,6 @@ import { ReactRenderer } from '@tiptap/react';
 import tippy from 'tippy.js';
 import CommandsList from './commands-list';
 
-// 命令定义
 const commands = [
     {
         title: 'Text',
@@ -56,7 +55,6 @@ const commands = [
         title: 'Image',
         command: ({ editor, range }: any) => {
             editor.chain().focus().deleteRange(range).run();
-            // 这里可以触发图片上传对话框
             const url = prompt('Enter image URL:');
             if (url) {
                 editor.chain().focus().setImage({ src: url }).run();

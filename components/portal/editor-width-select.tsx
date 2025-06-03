@@ -37,9 +37,7 @@ const EditorWidthSelect: FC = () => {
     const setTo = async (width: EDITOR_SIZE) => {
         close();
         try {
-            // 更新全局设置，与设置页面保持一致
             await updateSettings({ editorsize: width });
-            // 刷新页面以应用新的宽度设置
             window.location.reload();
         } catch (error) {
             console.error("Error whilst switching editor size", error);

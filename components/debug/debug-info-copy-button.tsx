@@ -56,7 +56,6 @@ export const DebugInfoCopyButton: FC<{
         navigator.clipboard
             .writeText(text)
             .then(() => {
-                // nothing
             })
             .catch((e) => {
                 console.error(

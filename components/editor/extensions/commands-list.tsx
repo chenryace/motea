@@ -48,9 +48,7 @@ const CommandsList = forwardRef<any, CommandsListProps>(({ items, command }, ref
             ref={containerRef}
             className="bg-gray-200 border border-gray-300 rounded-lg shadow-xl p-2 max-w-xs z-50"
             style={{
-                // 移除毛玻璃效果，使用纯色背景，让nightwind自动处理颜色转换
-                // backdropFilter: 'blur(8px)',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 6px rgba(0, 0, 0, 0.1)', // 保持黑色阴影以确保可见性
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 6px rgba(0, 0, 0, 0.1)', 
             }}
         >
             {items.length ? (

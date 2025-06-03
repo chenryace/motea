@@ -18,28 +18,24 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
             const { selection } = editor.state;
             const { from, to } = selection;
 
-            // 只有当有文本被选中时才显示工具栏
             if (from === to) {
                 setIsVisible(false);
                 return;
             }
 
-            // 获取选中文本的位置
             const start = editor.view.coordsAtPos(from);
             const end = editor.view.coordsAtPos(to);
 
-            // 计算工具栏位置（在选中文本上方居中）
             const centerX = (start.left + end.left) / 2;
-            const topY = start.top - 60; // 工具栏高度 + 间距
+            const topY = start.top - 60;
 
             setPosition({
                 top: topY,
-                left: centerX - 150, // 工具栏宽度的一半
+                left: centerX - 150, 
             });
             setIsVisible(true);
         };
 
-        // 监听选择变化
         editor.on('selectionUpdate', updateToolbar);
         editor.on('transaction', updateToolbar);
 
@@ -53,10 +49,9 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
         return null;
     }
 
-    // 根据主题设置样式 - 使用nightwind自动处理颜色转换
     const isDark = theme === 'dark';
-    const toolbarBg = 'bg-gray-200'; // 让nightwind自动转换，与侧边栏一致
-    const toolbarBorder = 'border-gray-300'; // 让nightwind自动转换
+    const toolbarBg = 'bg-gray-200'; 
+    const toolbarBorder = 'border-gray-300'; 
     const toolbarShadow = 'shadow-lg';
     const buttonText = isDark ? 'text-white' : 'text-gray-800';
     const buttonHover = isDark ? 'hover:bg-blue-500 hover:text-white' : 'hover:bg-yellow-400';
@@ -143,7 +138,6 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
                 top: position.top,
                 left: position.left,
                 transform: 'translateX(-50%)',
-                // 移除backgroundColor和borderColor，让nightwind自动处理
             }}
         >
             {toolbarButtons.map((button, index) => (

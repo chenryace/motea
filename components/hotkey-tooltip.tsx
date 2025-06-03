@@ -50,28 +50,23 @@ const HotkeyTooltip: FC<{
         keyMap.unshift(isMac ? '⌥' : 'alt');
     }
 
-    // Use native keyboard event handling (借鉴旧项目的简单实现)
     useEffect(() => {
         if (!keys.length) return;
 
         const handleKeyDown = (event: KeyboardEvent) => {
             const target = event.target as HTMLElement;
 
-            // 检查是否在编辑器或输入元素中
             const isInEditor = target.closest('.ProseMirror') ||
                              target.closest('[contenteditable]') ||
                              target.tagName === 'INPUT' ||
                              target.tagName === 'TEXTAREA';
 
-            // 如果在编辑器中，完全不处理快捷键（除非明确允许）
             if (isInEditor && !disableOnContentEditable) {
                 return;
             }
 
-            // 精确匹配键盘组合
             let matches = true;
 
-            // 检查修饰键
             if (commandKey && !(event.ctrlKey || event.metaKey)) {
                 matches = false;
             }
@@ -86,13 +81,11 @@ const HotkeyTooltip: FC<{
                 matches = false;
             }
 
-            // 检查主键
             if (keys.length === 1) {
                 if (event.key.toLowerCase() !== keys[0].toLowerCase()) {
                     matches = false;
                 }
             } else if (keys.length > 1) {
-                // 处理组合键（如 shift+O）
                 const hasShift = keys.includes('shift') || keys.includes('Shift');
                 if (hasShift && !event.shiftKey) {
                     matches = false;
@@ -114,7 +107,7 @@ const HotkeyTooltip: FC<{
             }
         };
 
-        document.addEventListener('keydown', handleKeyDown, true); // 使用捕获阶段
+        document.addEventListener('keydown', handleKeyDown, true); 
         return () => document.removeEventListener('keydown', handleKeyDown, true);
     }, [keys, commandKey, optionKey, onHotkey, disableOnContentEditable]);
 

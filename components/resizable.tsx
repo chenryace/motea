@@ -41,7 +41,6 @@ const Resizable: FC<{ width: number; children: ReactNodeLike }> = ({
         if (isFold) {
             splitRef.current?.split?.collapse(0);
         }
-        // width 改变引起 sizes 重置
     }, [isFold, sizes]);
 
     const updateSplitSizes = useCallback(

@@ -57,7 +57,6 @@ const MobileMainWrapper: FC<{ children: ReactNodeLike }> = ({ children }) => {
                 onClose={close}
                 onOpen={open}
                 hysteresis={0.4}
-                // todo 优化移动端左边按钮和滑动冲突的问题
                 disableDiscovery
             >
                 <Sidebar />

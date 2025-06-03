@@ -49,11 +49,9 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
         immediatelyRender: false,
         extensions: [
             StarterKit.configure({
-                // 禁用默认的 heading 扩展，我们会自定义
                 heading: {
                     levels: [1, 2, 3, 4, 5, 6],
                 },
-                // 配置代码块
                 codeBlock: {
                     languageClassPrefix: 'language-',
                 },
@@ -64,7 +62,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     class: 'text-blue-600 hover:text-blue-800 underline',
                 },
             }),
-            // 使用我们的自定义 ImageMarkdown 扩展
             ImageMarkdown.configure({
                 HTMLAttributes: {
                     class: 'max-w-full h-auto rounded-lg my-4',
@@ -96,20 +93,17 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
         },
         onUpdate: ({ editor }) => {
             if (onChange) {
-                // 获取 Markdown 格式的内容
                 const markdown = editor.storage.markdown?.transformer?.serialize(editor.state.doc) || editor.getHTML();
                 onChange(() => markdown);
             }
         },
         onCreate: ({ editor }) => {
-            // 编辑器创建时的初始化
             if (value && value !== editor.getHTML()) {
                 editor.commands.setContent(value);
             }
         },
     });
 
-    // 暴露方法给父组件
     useImperativeHandle(ref, () => ({
         focusAtEnd: () => {
             editor?.commands.focus('end');
@@ -119,7 +113,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
         },
     }));
 
-    // 处理内容变化
     useEffect(() => {
         if (editor && value !== undefined) {
             const currentContent = editor.getHTML();
@@ -129,7 +122,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
         }
     }, [editor, value]);
 
-    // 处理链接点击
     useEffect(() => {
         if (editor && onClickLink) {
             const handleClick = (event: MouseEvent) => {
@@ -152,7 +144,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
         }
     }, [editor, onClickLink]);
 
-    // 处理链接悬停
     useEffect(() => {
         if (editor && onHoverLink) {
             const handleMouseOver = (event: MouseEvent) => {
@@ -194,7 +185,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     line-height: 1.7;
                     font-size: 1rem;
                     color: inherit;
-                    /* 禁用拼写检查和自动更正 */
                     -webkit-spellcheck: false;
                     -moz-spellcheck: false;
                     -ms-spellcheck: false;
@@ -321,7 +311,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     height: 0;
                 }
 
-                /* 高亮样式 - 浅色主题深黄色，深色主题蓝色背景白色字体 */
                 .ProseMirror mark {
                     background-color: #fbbf24;
                     color: #1f2937;
@@ -336,19 +325,16 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: 500;
                 }
 
-                /* 修复深色主题下加粗+高亮的样式冲突 */
                 .dark .ProseMirror strong mark,
                 .dark .ProseMirror mark strong {
                     font-weight: bold;
                 }
 
-                /* 删除线样式 */
                 .ProseMirror s {
                     text-decoration: line-through;
                     color: #6b7280;
                 }
 
-                /* 下划线样式 */
                 .ProseMirror u {
                     text-decoration: underline;
                 }

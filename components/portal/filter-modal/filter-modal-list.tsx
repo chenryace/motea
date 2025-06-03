@@ -24,7 +24,6 @@ export default function FilterModalList<T>({
     const calcHeight = isMobileOnly ? height : (height * 2) / 3;
     const [selectedIndex, setSelectedIndex] = useState(0);
 
-    // Use native keyboard event handling
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             const target = event.target as HTMLElement;

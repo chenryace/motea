@@ -8,17 +8,8 @@ export interface HighlightOptions {
 declare module '@tiptap/core' {
     interface Commands<ReturnType> {
         highlight: {
-            /**
-             * Set a highlight mark
-             */
             setHighlight: (attributes?: { color?: string }) => ReturnType;
-            /**
-             * Toggle a highlight mark
-             */
             toggleHighlight: (attributes?: { color?: string }) => ReturnType;
-            /**
-             * Unset a highlight mark
-             */
             unsetHighlight: () => ReturnType;
         };
     }

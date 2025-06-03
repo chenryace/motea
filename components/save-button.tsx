@@ -16,61 +16,55 @@ interface SaveButtonProps {
 
 type SyncStatus = 'view' | 'save' | 'syncing' | 'synced' | 'fail';
 
-// 自定义样式
 const useStyles = makeStyles({
     saveButton: {
-        minWidth: '80px', // 加大宽度
+        minWidth: '80px',
         fontWeight: 'bold',
         textTransform: 'none',
-        borderRadius: '8px', // 添加圆角
-        boxShadow: 'none !important', // 移除阴影
+        borderRadius: '8px',
+        boxShadow: 'none !important',
         '&:hover': {
             opacity: 0.8,
-            boxShadow: 'none !important', // 悬停时也不要阴影
+            boxShadow: 'none !important',
         },
         '&:focus': {
-            boxShadow: 'none !important', // 聚焦时也不要阴影
+            boxShadow: 'none !important',
         },
         '&:active': {
-            boxShadow: 'none !important', // 点击时也不要阴影
+            boxShadow: 'none !important',
         },
     },
-    // view 状态：灰色背景白色字
     viewButton: {
-        backgroundColor: '#6B7280 !important', // 灰色
-        color: '#FFFFFF !important', // 白色字
+        backgroundColor: '#6B7280 !important',
+        color: '#FFFFFF !important',
         '&:hover': {
             backgroundColor: '#4B5563 !important',
         },
     },
-    // save 状态：红色背景白色字
     saveStateButton: {
-        backgroundColor: '#DC2626 !important', // 红色
-        color: '#FFFFFF !important', // 白色字
+        backgroundColor: '#DC2626 !important',
+        color: '#FFFFFF !important',
         '&:hover': {
             backgroundColor: '#B91C1C !important',
         },
     },
-    // syncing 状态：蓝色背景白色字
     syncingButton: {
-        backgroundColor: '#2563EB !important', // 蓝色
-        color: '#FFFFFF !important', // 白色字
+        backgroundColor: '#2563EB !important',
+        color: '#FFFFFF !important',
         '&:hover': {
             backgroundColor: '#1D4ED8 !important',
         },
     },
-    // synced 状态：黄色背景黑色字
     syncedButton: {
-        backgroundColor: '#FBBF24 !important', // 黄色
-        color: '#000000 !important', // 黑色字
+        backgroundColor: '#FBBF24 !important',
+        color: '#000000 !important',
         '&:hover': {
             backgroundColor: '#F59E0B !important',
         },
     },
-    // failed 状态：红色背景白色字
     failedButton: {
-        backgroundColor: '#DC2626 !important', // 红色
-        color: '#FFFFFF !important', // 白色字
+        backgroundColor: '#DC2626 !important',
+        color: '#FFFFFF !important',
         '&:hover': {
             backgroundColor: '#B91C1C !important',
         },
@@ -84,7 +78,6 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
     const syncedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 监听 IndexedDB 变化来检测编辑状态
     useEffect(() => {
         if (!note?.id) return;
 
@@ -100,11 +93,9 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
                     }
                 }
             } catch (error) {
-                console.error('Error checking IndexedDB:', error);
             }
         };
 
-        // 定期检查 IndexedDB 变化
         const interval = setInterval(checkIndexedDBChanges, 1000);
 
         return () => {
@@ -121,7 +112,6 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
     const handleSave = useCallback(async () => {
         setSyncStatus('syncing');
 
-        // 清除之前的超时
         if (syncedTimeoutRef.current) {
             clearTimeout(syncedTimeoutRef.current);
         }
@@ -129,10 +119,8 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
             clearTimeout(syncTimeoutRef.current);
         }
 
-        // 设置上传超时（30秒）
         syncTimeoutRef.current = setTimeout(() => {
             setSyncStatus('fail');
-            // failed 状态 2 秒后自动回到 view
             setTimeout(() => {
                 setSyncStatus('view');
             }, 2000);
@@ -141,7 +129,6 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
         try {
             const success = await syncToServer();
 
-            // 清除超时
             if (syncTimeoutRef.current) {
                 clearTimeout(syncTimeoutRef.current);
                 syncTimeoutRef.current = null;
@@ -150,32 +137,27 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
             if (success) {
                 setSyncStatus('synced');
 
-                // 3秒后回到 view 状态
                 syncedTimeoutRef.current = setTimeout(() => {
                     setSyncStatus('view');
                 }, 3000);
             } else {
                 setSyncStatus('fail');
-                // failed 状态 2 秒后自动回到 view
                 setTimeout(() => {
                     setSyncStatus('view');
                 }, 2000);
             }
         } catch (error) {
-            // 清除超时
             if (syncTimeoutRef.current) {
                 clearTimeout(syncTimeoutRef.current);
                 syncTimeoutRef.current = null;
             }
             setSyncStatus('fail');
-            // failed 状态 2 秒后自动回到 view
             setTimeout(() => {
                 setSyncStatus('view');
             }, 2000);
         }
     }, [syncToServer]);
 
-    // 暴露状态和保存方法给外部使用
     useEffect(() => {
         if (typeof window !== 'undefined') {
             (window as any).saveButtonStatus = syncStatus;
@@ -190,10 +172,8 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
         };
     }, [syncStatus, handleSave]);
 
-    // Add keyboard shortcut Ctrl+S / Cmd+S (借鉴旧项目的实现)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // 只在按下 Ctrl+S 或 Cmd+S 时处理
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 const target = e.target as HTMLElement;
                 const isInEditor = target.closest('.ProseMirror') ||
@@ -201,7 +181,6 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
                                  target.closest('textarea') ||
                                  target.closest('input');
 
-                // 只在编辑器区域或输入元素中响应 Ctrl+S
                 if (isInEditor) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -210,7 +189,7 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
             }
         };
 
-        document.addEventListener('keydown', handleKeyDown, true); // 使用捕获阶段
+        document.addEventListener('keydown', handleKeyDown, true);
         return () => document.removeEventListener('keydown', handleKeyDown, true);
     }, [handleSave]);
 

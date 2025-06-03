@@ -58,7 +58,6 @@ const NoteNav = () => {
         (event: MouseEvent) => {
             menu.setData(note);
             menu.setAnchor(event.target as Element);
-            // debugger;
             menu.open();
         },
         [note, menu]
@@ -120,7 +119,6 @@ const NoteNav = () => {
                                     {note.title}
                                 </span>
                             </Tooltip>
-                            {/* 在标题后面显示 UpdatedAt 信息 */}
                             <UpdatedAtDisplay className="inline-block ml-2" />
                             {!checkItemIsShown(note) && (
                                 <Tooltip title={t('Show note in tree')}>
@@ -136,7 +134,6 @@ const NoteNav = () => {
                         </span>
                     </Breadcrumbs>
                 )}
-                {/* eslint-disable-next-line react/no-unknown-property */}
                 <style jsx>
                     {`
                         .title {

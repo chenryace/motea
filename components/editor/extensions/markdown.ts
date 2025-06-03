@@ -1,25 +1,15 @@
 import { Extension } from '@tiptap/core';
 
-// 简单的 Markdown 转换器
 class MarkdownTransformer {
-    // 将 ProseMirror 文档转换为 Markdown（简化版本）
     serialize(doc: any): string {
-        // 这里我们使用一个简化的方法
-        // 实际上应该遍历 ProseMirror 文档节点并转换为 Markdown
-        // 暂时返回 HTML，后续可以改进
         return this.htmlToMarkdown(doc.content);
     }
 
-    // 将 Markdown 转换为 ProseMirror 文档（简化版本）
     parse(markdown: string): any {
-        // 简化的解析，实际应该使用 markdown-it 解析
         return markdown;
     }
 
-    // 简单的 HTML 到 Markdown 转换
     private htmlToMarkdown(content: any): string {
-        // 这是一个简化的实现
-        // 实际项目中应该使用更完善的转换器
         if (!content) return '';
 
         let markdown = '';
@@ -130,7 +120,6 @@ class MarkdownTransformer {
     }
 }
 
-// Tiptap 扩展
 export const MarkdownExtension = Extension.create({
     name: 'markdown',
 
@@ -154,9 +143,7 @@ export const MarkdownExtension = Extension.create({
 
     addKeyboardShortcuts() {
         return {
-            // Ctrl+S 保存快捷键
             'Mod-s': () => {
-                // 触发保存事件
                 const saveButton = document.querySelector('button[data-save-button]') as HTMLButtonElement;
                 if (saveButton) {
                     saveButton.click();

@@ -56,7 +56,6 @@ const SidebarListItem: FC<{
     const onAddNote = useCallback(
         (e: MouseEvent) => {
             e.preventDefault();
-            // Generate new ID and navigate directly
             const newId = genNewId();
             router.push(`/${newId}?new&pid=` + item.id, undefined, { shallow: true })
                 ?.catch((v) => console.error('Error whilst pushing to router: %O', v));

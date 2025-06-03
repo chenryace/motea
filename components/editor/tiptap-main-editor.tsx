@@ -28,19 +28,18 @@ const TiptapMainEditor: FC<
         note: editorNote,
     } = TiptapEditorState.useContainer();
 
-    // 获取当前编辑器宽度设置
     const currentEditorSize = note?.editorsize ?? settings.editorsize;
 
     let editorWidthClass: string;
     switch (currentEditorSize) {
         case EDITOR_SIZE.SMALL:
-            editorWidthClass = 'max-w-prose'; // ~65ch, 约 520px
+            editorWidthClass = 'max-w-prose';
             break;
         case EDITOR_SIZE.LARGE:
-            editorWidthClass = 'max-w-4xl'; // 896px
+            editorWidthClass = 'max-w-4xl';
             break;
         case EDITOR_SIZE.AS_WIDE_AS_POSSIBLE:
-            editorWidthClass = 'max-w-full mx-4'; // 全宽，左右留边距
+            editorWidthClass = 'max-w-full mx-4';
             break;
         default:
             editorWidthClass = 'max-w-prose';
