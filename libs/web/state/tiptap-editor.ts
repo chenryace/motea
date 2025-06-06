@@ -18,6 +18,7 @@ import { TiptapEditorRef } from 'components/editor/tiptap-editor';
 import UIState from 'libs/web/state/ui';
 import { has } from 'lodash';
 // import { ROOT_ID } from 'libs/shared/const';
+import { parseMarkdownTitle } from 'libs/shared/markdown/parse-markdown-title';
 const ROOT_ID = 'root';
 
 const useTiptapEditor = (initNote?: NoteModel) => {
@@ -196,25 +197,15 @@ const useTiptapEditor = (initNote?: NoteModel) => {
                     currentTitle === 'New Page' ||
                     currentTitle === '' ||
                     (currentTitle.includes('<') && currentTitle.includes('>'))) {
-
-                    const lines = content.split('\n');
-                    const firstLine = lines[0]?.replace(/^#\s*/, '').trim() || '';
-
-                    if (firstLine) {
-                        title = firstLine
-                            .replace(/\*\*(.*?)\*\*/g, '$1')
-                            .replace(/\*(.*?)\*/g, '$1')
-                            .replace(/`(.*?)`/g, '$1')
-                            .replace(/\[(.*?)\]\(.*?\)/g, '$1')
-                            .trim();
-                    } else {
-                        title = 'Untitled';
-                    }
+                    
+                    const parsed = parseMarkdownTitle(content);
+                    title = parsed.title || 'Untitled'; // Use 'Untitled' if no title found
                 } else {
                     title = currentTitle;
                 }
             }
 
+            await saveToIndexedDB({ content, title });
             // Save to IndexedDB immediately for local persistence
             saveToIndexedDB({
                 content,
