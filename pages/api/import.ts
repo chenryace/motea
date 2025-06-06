@@ -37,6 +37,11 @@ export default api()
         const pid = (req.query.pid as string) || ROOT_ID;
         const file = await readFileFromRequest(req);
 
+        if (!file || !file.path) {
+            console.error('File not received or file path is missing');
+            return res.status(400).json({ error: 'File not received or invalid file data' });
+        }
+
         if (file.size > IMPORT_FILE_LIMIT_SIZE) {
             return res.APIError.IMPORT_FILE_LIMIT_SIZE.throw();
         }
