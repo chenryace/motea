@@ -7,7 +7,11 @@ export function readFileFromRequest(req: ApiRequest): Promise<File> {
 
         form.parse(req, (err, _fields, files) => {
             if (err) return reject(err);
-            resolve(Array.isArray(files.file) ? files.file[0] : files.file);
+            const uploadedFile = Array.isArray(files.file) ? files.file[0] : files.file;
+            if (!uploadedFile) {
+                return reject(new Error('No file found in request under field name "file"'));
+            }
+            resolve(uploadedFile);
         });
     });
 }
