@@ -216,6 +216,7 @@ export const MarkdownExtension = Extension.create({
 
     addInputRules() {
         return [
+            // 标题输入规则
             textblockTypeInputRule({
                 find: /^(#)\s$/,
                 type: this.editor.schema.nodes.heading,
@@ -246,6 +247,15 @@ export const MarkdownExtension = Extension.create({
                 type: this.editor.schema.nodes.heading,
                 getAttributes: () => ({ level: 6 }),
             }),
+            // 列表输入规则
+            textblockTypeInputRule({
+                find: /^[-*] $/,
+                type: this.editor.schema.nodes.bulletList
+            }),
+            textblockTypeInputRule({
+                find: /^1[.)] $/,
+                type: this.editor.schema.nodes.orderedList
+            })
         ];
     },
 
@@ -279,9 +289,9 @@ export const MarkdownExtension = Extension.create({
                                     break;
                                 }
                             }
-                        }, 10); 
+                        }, 10);
 
-                        return false; 
+                        return false;
                     },
                 }
             })
@@ -297,6 +307,18 @@ export const MarkdownExtension = Extension.create({
                 }
                 return true;
             },
+            'Tab': () => this.editor.commands.sinkListItem('listItem'),
+            'Shift-Tab': () => this.editor.commands.liftListItem('listItem'),
+            'Enter': () => {
+                const { state } = this.editor;
+                const { $from } = state.selection;
+                
+                // 如果在空的列表项中按回车，跳出列表
+                if ($from.parent.type.name === 'listItem' && $from.parent.textContent === '') {
+                    return this.editor.commands.liftListItem('listItem');
+                }
+                return false; // 让 Tiptap 处理其他情况
+            }
         };
     },
 });
