@@ -45,6 +45,20 @@ export default api()
         const zipEntries = zip.getEntries();
         const total = zipEntries.length;
 
+        if (total === 0) {
+            return res.status(400).json({ error: 'ZIP file is empty' });
+        }
+
+        // 检查是否包含 Markdown 文件
+        const hasMarkdownFiles = zipEntries.some(entry => {
+            const ext = extname(entry.name);
+            return MARKDOWN_EXT.includes(ext.toLowerCase());
+        });
+
+        if (!hasMarkdownFiles) {
+            return res.status(400).json({ error: 'No Markdown files found in ZIP' });
+        }
+
         // Step 1: Build hierarchy of entries
         type HierarchyNode = {
             name: string;
@@ -53,25 +67,20 @@ export default api()
         };
         type Hierarchy = Record<string, HierarchyNode>;
 
-        // this is the actual code that
         const hierachy: Hierarchy = {};
         zipEntries.forEach((v) => {
             let name: string = v.name;
             if (!v.isDirectory) {
-                const entryNameExtension = extname(v.name);
-                let isMarkdown = false;
-                for (const extension of MARKDOWN_EXT) {
-                    if (extension === entryNameExtension) {
-                        name = v.name.substring(
-                            0,
-                            v.name.length - extension.length
-                        );
-                        isMarkdown = true;
-                        break;
-                    }
-                }
-                if (!isMarkdown) {
-                    return; // Don't add it if it's not markdown
+                const entryNameExtension = extname(v.name).toLowerCase();
+                let isMarkdown = MARKDOWN_EXT.includes(entryNameExtension);
+                
+                if (isMarkdown) {
+                    name = v.name.substring(
+                        0,
+                        v.name.length - entryNameExtension.length
+                    );
+                } else {
+                    return; // 不是 Markdown 文件，跳过
                 }
             }
             const pathParts = v.entryName.split('/');
@@ -108,10 +117,15 @@ export default api()
                 const entry = currentNode.entry;
                 date = entry.header.time.toISOString();
                 if (!entry.isDirectory) {
-                    const rawContent = entry.getData().toString('utf-8');
-                    const parsed = parseMarkdownTitle(rawContent);
-                    title = parsed.title;
-                    content = parsed.content;
+                    try {
+                        const rawContent = entry.getData().toString('utf-8');
+                        const parsed = parseMarkdownTitle(rawContent);
+                        title = parsed.title;
+                        content = parsed.content;
+                    } catch (error) {
+                        console.error(`Error processing file ${entry.name}:`, error);
+                        throw new Error(`Failed to process Markdown file: ${entry.name}`);
+                    }
                 }
             }
             const note = {
@@ -125,7 +139,7 @@ export default api()
             const createdNote = await createNote(note, req.state);
             await req.state.treeStore.addItem(createdNote.id, parent);
             count++;
-            // Object.values(currentNode.children).map((v) => createNotes(v, createdNote.id))
+            
             for (const child of Object.values(currentNode.children)) {
                 await createNotes(child, createdNote.id);
             }
@@ -133,9 +147,13 @@ export default api()
             return createdNote.id;
         }
 
-        await Promise.all(
-            Object.values(hierachy).map((v) => createNotes(v, pid))
-        );
-
-        res.json({ total, imported: count });
+        try {
+            await Promise.all(
+                Object.values(hierachy).map((v) => createNotes(v, pid))
+            );
+            res.json({ total, imported: count });
+        } catch (error) {
+            console.error('Error importing notes:', error);
+            res.status(500).json({ error: error.message });
+        }
     });
