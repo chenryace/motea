@@ -10,6 +10,7 @@ import { getPathNoteById } from 'libs/server/note-path';
 import { NOTE_DELETED } from 'libs/shared/meta';
 import { metaToJson } from 'libs/server/meta';
 import { toBuffer } from 'libs/shared/str';
+import { convertHtmlToMarkdown } from 'libs/shared/html-to-markdown';
 
 export function escapeFileName(name: string): string {
     // list of characters taken from https://www.mtu.edu/umc/services/websites/writing/characters-avoid/
@@ -47,7 +48,8 @@ export default api()
                 : basePath;
             duplicate[basePath] = (duplicate[basePath] ?? 0) + 1;
 
-            zip.addFile(`${uniquePath}.md`, toBuffer(note.content));
+            const markdownContent = note.content ? convertHtmlToMarkdown(note.content) : '';
+            zip.addFile(`${uniquePath}.md`, toBuffer(markdownContent));
             await Promise.all(item.children.map((v) => addItem(v, uniquePath)));
         }
 
