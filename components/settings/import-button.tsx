@@ -22,7 +22,7 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
     const { t } = useI18n();
     const toast = useToast();
     const router = useRouter();
-    const { createNote, updateNote } = NoteState.useContainer();
+    const { createNote, mutateNote } = NoteState.useContainer(); // Changed updateNote to mutateNote
     // We might not need TiptapEditorState directly if NoteState handles content updates through Tiptap
     // const tiptapEditorState = TiptapEditorState.useContainer(); 
     const [loading, setLoading] = useState(false);
@@ -55,7 +55,7 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
                         // 1. Create a new note to get an ID
                         const newNote = await createNote({
                             title: fileName, // Initial title
-                            content: '', // Initial empty content, will be updated
+                            // Content will be set by mutateNote
                             pid: parentId,
                         });
 
@@ -65,23 +65,15 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
                         }
                         console.log(`Created note shell for ${fileName} with ID: ${newNote.id}`);
                         
-                        // 2. Update the note with Markdown content.
-                        // This assumes `updateNote` (or a similar function in NoteState/TiptapEditorState)
-                        // will correctly process the Markdown through Tiptap and save to IndexedDB and server.
-                        const updatedNoteData: Partial<NoteModel> = {
-                            id: newNote.id,
+                        // 2. Update the note with Markdown content using mutateNote.
+                        const noteToSave: Partial<NoteModel> = {
+                            // id is passed as first param to mutateNote
                             title: fileName, // Ensure title is set correctly
                             content: markdownContent, // Provide Markdown content
                         };
 
-                        const savedNote = await updateNote(updatedNoteData as NoteModel); 
-                        // updateNote might internally use TiptapEditorState.onEditorChange or similar logic
-                        // to process markdown and then TiptapEditorState.syncToServer
-
-                        if (!savedNote) {
-                             console.error(`Failed to save content for note: ${fileName} (ID: ${newNote.id})`);
-                            throw new Error(`Failed to save content for note: ${fileName}`);
-                        }
+                        // Use mutateNote to directly update the content of the created note
+                        await mutateNote(newNote.id, noteToSave);
 
                         console.log(`Successfully imported and saved: ${fileName} (ID: ${newNote.id})`);
                         successCount++;
@@ -110,7 +102,7 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
                 router.reload(); // Reload to see new notes
             }
         },
-        [parentId, createNote, updateNote, router, t, toast]
+        [parentId, createNote, mutateNote, router, t, toast] // Changed updateNote to mutateNote
     );
 
     const onSelectFile = useCallback(
