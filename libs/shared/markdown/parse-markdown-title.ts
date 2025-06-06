@@ -16,13 +16,22 @@ export const parseMarkdownTitle = (content: string) => {
     }
 
     // Remove heading markers if present
-    const title = firstLine.replace(/^#+\s*/,'').trim();
-    
-    // Remove the first line from content if it was used as title
-    const remainingContent = content.replace(firstLine, '').trim();
+    let title = firstLine.replace(/^#+\s*/, '').trim();
+
+    // Remove other common markdown formatting
+    // Order matters here: remove links first, then other inline formatting
+    title = title
+        .replace(/!?\[(.*?)\]\(.*?\)/g, '$1') // Remove links and images, keeping the text: [text](url) or ![alt](url) -> text/alt
+        .replace(/\*\*(.*?)\*\*/g, '$1') // Bold: **text** -> text
+        .replace(/\*(.*?)\*/g, '$1')     // Italic: *text* -> text
+        .replace(/__(.*?)__/g, '$1')    // Bold (underscore): __text__ -> text
+        .replace(/_(.*?)_/g, '$1')      // Italic (underscore): _text_ -> text
+        .replace(/~~(.*?)~~/g, '$1')    // Strikethrough: ~~text~~ -> text
+        .replace(/`(.*?)`/g, '$1')      // Inline code: `code` -> code
+        .trim();
     
     return {
-        content: remainingContent,
+        content: content, // 保留原始内容
         title: title.length > 0 ? title : undefined,
     };
 };
