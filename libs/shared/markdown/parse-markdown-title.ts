@@ -16,7 +16,7 @@ export const parseMarkdownTitle = (content: string) => {
     }
 
     // Remove heading markers if present
-    const title = firstLine.replace(/^#+\s*/, '').trim();
+    const title = firstLine.replace(/^#+\s*/,*,'').trim();
     
     // Remove the first line from content if it was used as title
     const remainingContent = content.replace(firstLine, '').trim();
