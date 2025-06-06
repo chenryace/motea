@@ -83,7 +83,7 @@ export default api()
                     return; // 不是 Markdown 文件，跳过
                 }
             }
-            const pathParts = v.entryName.split('/');
+            const pathParts = v.entryName.split(/[\\/]/).filter(Boolean); // 同时处理 '/' 和 '\' 分隔符
 
             let currentHierarchy = hierachy;
             let me: HierarchyNode | undefined;
