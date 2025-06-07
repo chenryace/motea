@@ -1,0 +1,92 @@
+# Docker Compose for motea complete deployment
+# Based on the open-source project Notea, originally created by qingwei-li<cinwell.li@gmail.com>
+# Modified and maintained by waycaan, 2025.
+#
+# 🚀 快速开始:
+# 1. 修改下面的 PASSWORD 为你的安全密码
+# 2. 修改 PRELOAD_NOTES_COUNT 为你想要的预加载笔记数量
+# 3. 运行: docker-compose up -d
+# 4. 等待部署完成（约1-2分钟）
+# 5. 访问: http://localhost:3000
+#
+# 📁 数据备份:
+# - 数据库文件位于 Docker 卷 postgres_data 中
+# - 可以取消注释第67行，将数据库映射到主机目录 ./motea_database
+# - 然后可以直接通过FTP备份整个 motea_database 文件夹
+#
+# ⚙️ 配置说明:
+# - PASSWORD: 应用访问密码，默认 "motea"，强烈建议修改
+# - PRELOAD_NOTES_COUNT: 预加载笔记数量，建议5-20，默认10
+
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库服务
+  postgres:
+    image: postgres:15-alpine
+    container_name: motea-postgres
+    environment:
+      POSTGRES_DB: motea 
+      POSTGRES_USER: motea
+      POSTGRES_PASSWORD: motea
+    volumes:
+      # 持久化数据库数据
+      - ./postgres_data:/var/lib/postgresql/data
+
+      # 可选：映射数据库到主机目录，便于直接备份
+      # - ./motea_database:/var/lib/postgresql/data
+
+    restart: unless-stopped
+
+  # motea 应用服务
+  motea:
+    image: ghcr.io/waycaan/motea:${TAG:-latest}
+    container_name: motea
+    ports:
+      - "3000:3000"  //自己决定映射端口。。。。。。。。。。。。。。。。。。
+    environment:
+      # Basic configuration
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NEXT_TELEMETRY_DISABLED=1
+      # 应用基础URL（关键配置）
+      - BASE_URL=http://localhost:3000
+      - COOKIE_SECURE=false 
+      # Database connection (禁用SSL，因为内部网络不需要)
+      - DATABASE_URL=postgresql://motea:motea@postgres:5432/motea?sslmode=disable //disable要保留，因为这个是内建的数据库，当然你也可以用你自己的加郑虎
+
+      # ========================================
+      # 🔧 用户配置区域 - 请修改以下两个变量
+      # ========================================
+
+      # 应用访问密码（强烈建议修改！）
+      - PASSWORD=motea
+
+      # 预加载笔记数量（建议5-20）
+      - PRELOAD_NOTES_COUNT=10
+
+      # ========================================
+
+      # 其他配置（通常不需要修改）
+      - DISABLE_PASSWORD=false
+
+    restart: unless-stopped
+
+    # 等待数据库启动
+    depends_on:
+      - postgres
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.8'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+volumes:
+  postgres_data:
+    driver: local
