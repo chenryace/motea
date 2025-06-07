@@ -44,12 +44,31 @@
 点击 `Deploy` 开始部署，初次部署大约需 **2 分钟**。完成后即可访问。
 
 ---
+
+## docker部署
+
+### 下载`docker-compose.yml`到你指定的文件夹中，修改几个参数,仅支持X86和arm64。
+
+password=motea
+
+PRELOAD_NOTES_COUNT=10  //也可以不改，反正容器的速度快，才几个K的传输
+
+COOKIE_SECURE=false //局域网就维持这个false吧。
+
+### 部署成功后有SSL证书，必须修改，因为依赖的验证与这2个相关。
+
+COOKIE_SECURE=true
+
+BASE_URL=http://localhost:3000 这里修改为你网页
+
+---
+
 计划
 增加docker本地部署。所以你看到部分代码和config文件中存在supabase和自建postgresql的选项。
 
 ## 📝 协议
 
-本项目基于 [Notea](https://github.com/notea-org/notea) 开源项目开发，遵循其 MIT License。原始版权声明已完整保留，感谢原作者的开源贡献。
+本项目基于 [Notea](https://github.com/notea-org/notea) 开源项目开发，遵循其 MIT License。原始版权声明已保留，感谢原作者的开源贡献。
 
 ---
 - 虽然原项目弃坑了，但一直都想复活它。无它，就因为它优雅。
