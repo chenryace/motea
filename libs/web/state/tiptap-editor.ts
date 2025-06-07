@@ -19,6 +19,7 @@ import UIState from 'libs/web/state/ui';
 import { has } from 'lodash';
 // import { ROOT_ID } from 'libs/shared/const';
 import { parseMarkdownTitle } from 'libs/shared/markdown/parse-markdown-title';
+import { wrapEditorChangeForIME } from 'libs/web/utils/simple-ime-fix';
 const ROOT_ID = 'root';
 
 const useTiptapEditor = (initNote?: NoteModel) => {
@@ -166,7 +167,8 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         setBackLinks(linkNotes);
     }, [note?.id]);
 
-    const onEditorChange = useCallback(
+    // 原始的编辑器变化处理逻辑
+    const originalOnEditorChange = useCallback(
         async (value: () => string): Promise<void> => {
             const content = value();
 
@@ -197,7 +199,7 @@ const useTiptapEditor = (initNote?: NoteModel) => {
                     currentTitle === 'New Page' ||
                     currentTitle === '' ||
                     (currentTitle.includes('<') && currentTitle.includes('>'))) {
-                    
+
                     const parsed = parseMarkdownTitle(content);
                     title = parsed.title || 'Untitled'; // Use 'Untitled' if no title found
                 } else {
@@ -215,6 +217,9 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         },
         [saveToIndexedDB, note?.isDailyNote, note?.id]
     );
+
+    // 使用 IME 安全的包装器
+    const onEditorChange = wrapEditorChangeForIME(originalOnEditorChange, 600);
 
     // Function to handle title changes specifically
     const onTitleChange = useCallback(
