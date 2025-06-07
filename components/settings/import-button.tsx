@@ -1,5 +1,5 @@
 import { ChangeEvent, FC, useCallback, useEffect, useState } from 'react';
-import useI18n from 'libs/web/hooks/use-i18n';More actions
+import useI18n from 'libs/web/hooks/use-i18n';
 import { ButtonProps } from './type';
 import { useToast } from 'libs/web/hooks/use-toast';
 import { ButtonProgress } from 'components/button-progress';
