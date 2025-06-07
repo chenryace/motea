@@ -6,7 +6,6 @@ import { ButtonProgress } from 'components/button-progress';
 import { useRouter } from 'next/router';
 import { ROOT_ID } from 'libs/shared/tree';
 import NoteState from 'libs/web/state/note';
-import TiptapEditorState from 'libs/web/state/tiptap-editor';
 import { NoteModel } from 'libs/shared/note';
 
 const readFileAsText = (file: File): Promise<string> => {
@@ -23,6 +22,7 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
     const toast = useToast();
     const router = useRouter();
     const { createNote, mutateNote } = NoteState.useContainer();
+    // const tiptapEditorState = TiptapEditorState.useContainer(); // Not needed for direct mutation
     const [loading, setLoading] = useState(false);
 
     const processFiles = useCallback(
@@ -63,14 +63,8 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
                         console.log(`Created note shell for ${fileName} with ID: ${newNote.id}`);
 
                         // 2. Update the note with Markdown content using mutateNote.
-                        const noteToSave: Partial<NoteModel> = {
-                            // id is passed as first param to mutateNote
-                            title: fileName, // Ensure title is set correctly
-                            content: markdownContent, // Provide Markdown content
-                        };
-
-                        // Use mutateNote to directly update the content of the created note
-                        await mutateNote(newNote.id, noteToSave);
+                        // Directly pass the id and an object with the content to mutateNote.
+                        await mutateNote(newNote.id, { content: markdownContent });
 
                         console.log(`Successfully imported and saved: ${fileName} (ID: ${newNote.id})`);
                         successCount++;
@@ -99,7 +93,7 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
                 router.reload(); // Reload to see new notes
             }
         },
-        [parentId, createNote, mutateNote, router, t, toast] // Changed updateNote to mutateNote
+        [parentId, createNote, mutateNote, router, t, toast]
     );
 
     const onSelectFile = useCallback(
