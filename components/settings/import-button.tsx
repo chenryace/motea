@@ -7,6 +7,7 @@ import { useRouter } from 'next/router';
 import { ROOT_ID } from 'libs/shared/tree';
 import NoteState from 'libs/web/state/note';
 import { NoteModel } from 'libs/shared/note';
+import markdownProcessor from 'libs/web/utils/markdown-processor';
 
 const readFileAsText = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -48,7 +49,7 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
                     const fileName = file.name.replace(/\.md$/, '');
                     const markdownContent = await readFileAsText(file);
                     console.log(`Read file: ${fileName}`);
-                    console.log('Markdown content after readFileAsText:', JSON.stringify(markdownContent)); // Log content after reading
+                    console.log('Raw markdown content:', JSON.stringify(markdownContent));
 
                     try {
                         // 1. Create a new note to get an ID
@@ -63,10 +64,12 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
                         }
                         console.log(`Created note shell for ${fileName} with ID: ${newNote.id}`);
 
-                        // 2. Update the note with Markdown content using mutateNote.
-                        // Directly pass the id and an object with the content to mutateNote.
-                        console.log('Markdown content before mutateNote:', JSON.stringify(markdownContent)); // Log content before mutating
-                        await mutateNote(newNote.id, { content: markdownContent });
+                        // 2. 处理 markdown 内容，转换为 TipTap 可以理解的格式
+                        const processedContent = markdownProcessor.processImportedContent(markdownContent);
+                        console.log('Processed content for TipTap:', JSON.stringify(processedContent));
+
+                        // 3. Update the note with processed content using mutateNote
+                        await mutateNote(newNote.id, { content: processedContent });
 
                         console.log(`Successfully imported and saved: ${fileName} (ID: ${newNote.id})`);
                         successCount++;
