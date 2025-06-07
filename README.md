@@ -21,6 +21,10 @@
 
 > 为获得最佳体验，请使用 **Neon 数据库 Washington, D.C., USA (East)** 区域节点。因大部分用户使用 Vercel 免费计划（主机位于美国），使用该节点可获得最低延迟。
 
+[数据库生成教学](/doc/neon.md)
+
+---
+
 ### 1. Fork 本项目
 
 点击右上角 `Fork`，将项目复制到你的 GitHub 账户下。
@@ -35,7 +39,7 @@
 
 | 变量名              | 示例值或说明                      |
 |---------------------|----------------------------------|
-| `DATABASE_URL`      | Neon 提供的 PostgreSQL 连接地址 |
+| `DATABASE_URL`      | [数据库生成教学](/doc/neon.md) |
 | `PASSWORD`          | 登录密码（任意设置）            |
 | `PRELOAD_NOTES_COUNT` | `10`（预加载笔记条数）        |
 
