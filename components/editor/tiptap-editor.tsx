@@ -387,7 +387,7 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     text-decoration: underline;
                 }
 
-                /* Task List Styles */
+                /* Task List Styles - 使用与普通列表相同的布局方式 */
                 .ProseMirror ul[data-type="taskList"] {
                     list-style: none;
                     padding-left: 0;
@@ -395,47 +395,55 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 }
 
                 .ProseMirror ul[data-type="taskList"] li {
-                    display: flex;
-                    align-items: center;
-                    margin: 0.25rem 0;
-                    padding-left: 0;
-                    line-height: 1.7;
-                    min-height: auto;
+                    position: relative;
+                    padding-left: 1.5rem; /* 与普通列表保持一致 */
+                    margin: 10.rem 0; /* 增加行距，使其与普通列表视觉效果一致 */
+                    display: block; /* 使用 block 而不是 flex */
+                    line-height: 4; /* 恢复行高设置，确保内部换行有足够间距 */
                 }
 
                 .ProseMirror ul[data-type="taskList"] li::before {
-                    display: none;
+                    display: none; /* 隐藏默认的 bullet */
                 }
 
+                /* Checkbox 标签 - 使用绝对定位，类似普通列表的 ::before */
                 .ProseMirror ul[data-type="taskList"] li > label {
-                    flex-shrink: 0;
-                    margin-right: 0.5rem;
-                    margin-top: 0;
-                    user-select: none;
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    width: 1.5rem;
+                    height: 1.7em; /* 与行高一致 */
                     display: flex;
-                    align-items: center;
-                    line-height: 1;
-                }
-
-                .ProseMirror ul[data-type="taskList"] li > div {
-                    flex: 1;
-                    line-height: 1.7;
-                }
-
-                .ProseMirror ul[data-type="taskList"] li > div > p {
+                    align-items: center; /* 居中对齐，与 bullet 的基线对齐方式一致 */
+                    justify-content: flex-start;
+                    user-select: none;
                     margin: 0;
-                    line-height: 1.7;
                 }
 
+                /* Checkbox 输入框 */
                 .ProseMirror ul[data-type="taskList"] li input[type="checkbox"] {
                     width: 1rem;
                     height: 1rem;
                     cursor: pointer;
                     accent-color: #3b82f6;
                     margin: 0;
-                    vertical-align: middle;
+                    flex-shrink: 0;
                 }
 
+                /* 内容区域 */
+                .ProseMirror ul[data-type="taskList"] li > div {
+                    display: block;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    line-height: 1.7; /* 确保内容区域有足够的行间距 */
+                }
+
+                .ProseMirror ul[data-type="taskList"] li > div > p {
+                    margin: 0;
+                    line-height: 1.7; /* 确保段落有足够的行间距 */
+                }
+
+                /* 已完成任务的样式 */
                 .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
                     text-decoration: line-through;
                     color: #6b7280;
