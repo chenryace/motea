@@ -36,14 +36,10 @@ const BrowserSidebar: FC = () => {
 };
 
 const MobileSidebar: FC = () => {
-    const {
-        sidebar: { isFold },
-    } = UIState.useContainer();
-
     return (
-        <section className="flex h-full w-full">
+        <section className="flex h-full" style={{ width: '80vw' }}>
             <SidebarTool />
-            {!isFold && <SideBarList />}
+            <SideBarList />
         </section>
     );
 };
