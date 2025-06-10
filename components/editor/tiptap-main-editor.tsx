@@ -50,7 +50,7 @@ const TiptapMainEditor: FC<
     let editorWidthClass: string;
     switch (currentEditorSize) {
         case EDITOR_SIZE.SMALL:
-            editorWidthClass = 'max-w-lg';
+            editorWidthClass = 'max-w-400';
             break;
         case EDITOR_SIZE.LARGE:
             editorWidthClass = 'max-w-4xl';
@@ -59,7 +59,7 @@ const TiptapMainEditor: FC<
             editorWidthClass = 'max-w-full mx-4';
             break;
         default:
-            editorWidthClass = 'max-w-lg';
+            editorWidthClass = 'max-w-400';
             break;
     }
 

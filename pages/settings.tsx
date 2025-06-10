@@ -13,6 +13,35 @@ import { SSRContext, ssr } from 'libs/server/connect';
 import { applyReset } from 'libs/server/middlewares/reset';
 import { applyMisconfiguration } from 'libs/server/middlewares/misconfiguration';
 import { DebugInformation } from 'libs/shared/debugging';
+import UIState from 'libs/web/state/ui';
+import IconButton from 'components/icon-button';
+import { useCallback, MouseEvent } from 'react';
+
+const SettingsMenuButton = () => {
+    const { sidebar, ua } = UIState.useContainer();
+
+    const onToggle = useCallback(
+        (e: MouseEvent) => {
+            e.stopPropagation();
+            sidebar.toggle()
+                ?.catch((v) => console.error('Error whilst toggling sidebar: %O', v));
+        },
+        [sidebar]
+    );
+
+    // 只在移动端显示菜单按钮
+    if (!ua.isMobileOnly) {
+        return null;
+    }
+
+    return (
+        <IconButton
+            icon="Menu"
+            className="mr-4 active:bg-gray-400"
+            onClick={onToggle}
+        />
+    );
+};
 
 const SettingsPage: NextPage<{ debugInformation: DebugInformation, tree: TreeModel }> = ({ tree, debugInformation }) => {
     const { t } = useI18n();
@@ -21,9 +50,12 @@ const SettingsPage: NextPage<{ debugInformation: DebugInformation, tree: TreeMod
         <LayoutMain tree={tree}>
             <section className="py-40 h-full overflow-y-auto">
                 <div className="px-6 max-w-prose m-auto">
-                    <h1 className="font-normal text-4xl mb-10">
-                        <span>{t('Settings')}</span>
-                    </h1>
+                    <div className="flex items-center mb-10">
+                        <SettingsMenuButton />
+                        <h1 className="font-normal text-4xl">
+                            <span>{t('Settings')}</span>
+                        </h1>
+                    </div>
 
                     <SettingsContainer debugInfo={debugInformation} />
                     <SettingFooter />

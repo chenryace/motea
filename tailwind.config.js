@@ -26,6 +26,9 @@ module.exports = {
                 typography: true,
                 colorClasses: ['divide', 'placeholder'],
             },
+            maxWidth: {
+                '400': '400px',
+            },
         },
         fontFamily: {
             sans: ['Noto Sans'].concat(defaultConfig.theme.fontFamily['sans']),
