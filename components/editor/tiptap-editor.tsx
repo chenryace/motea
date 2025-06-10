@@ -413,7 +413,7 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 .ProseMirror ul[data-type="taskList"] li {
                     position: relative;
                     padding-left: 1.5rem; /* 与普通列表保持一致 */
-                    margin: 10rem 0; /* 与普通列表保持一致 */
+                    margin: 1rem 0; /* 与普通列表保持一致 */
                     display: block; /* 使用 block 而不是 flex */
                     line-height: 1.7; /* 恢复行高设置，确保内部换行有足够间距 */
                     word-wrap: break-word;
