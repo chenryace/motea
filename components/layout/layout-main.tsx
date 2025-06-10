@@ -51,18 +51,12 @@ const MobileMainWrapper: FC<{ children: ReactNodeLike }> = ({ children }) => {
 
     return (
         <div className="flex h-full">
-            <SwipeableDrawer
-                anchor="left"
-                open={isFold}
-                onClose={close}
-                onOpen={open}
-                hysteresis={0.4}
-                disableDiscovery
-            >
+            {/* 在移动端，侧栏始终可见，不使用抽屉模式 */}
+            <div className={`transition-all duration-300 ${isFold ? 'w-12' : 'w-80'}`}>
                 <Sidebar />
-            </SwipeableDrawer>
+            </div>
 
-            <main className="flex-grow" onClick={close}>
+            <main className="flex-grow">
                 {children}
             </main>
             <style jsx global>
