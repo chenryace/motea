@@ -212,37 +212,15 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     line-height: 1.7;
                     font-size: 1rem;
                     color: inherit;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                     -webkit-spellcheck: false;
                     -moz-spellcheck: false;
                     -ms-spellcheck: false;
                     spellcheck: false;
                 }
 
-                /* 移动端优化 */
-                @media (max-width: 767px) {
-                    .ProseMirror {
-                        padding: 0.5rem 0;
-                        font-size: 0.95rem;
-                        line-height: 1.6;
-                    }
-                }
-
                 .ProseMirror p {
                     margin: 1rem 0;
                     line-height: 1.7;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
-                    hyphens: auto;
-                }
-
-                /* 移动端段落优化 */
-                @media (max-width: 767px) {
-                    .ProseMirror p {
-                        margin: 0.75rem 0;
-                        line-height: 1.6;
-                    }
                 }
 
                 .ProseMirror h1 {
@@ -250,17 +228,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1.5rem 0 1rem 0;
                     line-height: 1.2;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
-                }
-
-                /* 移动端标题优化 */
-                @media (max-width: 767px) {
-                    .ProseMirror h1 {
-                        font-size: 2.2em;
-                        margin: 1rem 0 0.75rem 0;
-                        line-height: 1.3;
-                    }
                 }
 
                 .ProseMirror h2 {
@@ -268,8 +235,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1.3rem 0 0.8rem 0;
                     line-height: 1.3;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h3 {
@@ -277,8 +242,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1.2rem 0 0.6rem 0;
                     line-height: 1.4;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h4 {
@@ -286,8 +249,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1.1rem 0 0.5rem 0;
                     line-height: 1.4;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h5 {
@@ -295,8 +256,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1rem 0 0.4rem 0;
                     line-height: 1.5;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h6 {
@@ -304,8 +263,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 0.9rem 0 0.3rem 0;
                     line-height: 1.5;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror ul {
@@ -440,11 +397,9 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 .ProseMirror ul[data-type="taskList"] li {
                     position: relative;
                     padding-left: 1.5rem; /* 与普通列表保持一致 */
-                    margin: 0.25rem 0; /* 与普通列表保持一致 */
+                    margin: 10.rem 0; /* 增加行距，使其与普通列表视觉效果一致 */
                     display: block; /* 使用 block 而不是 flex */
-                    line-height: 1.7; /* 恢复行高设置，确保内部换行有足够间距 */
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
+                    line-height: 4; /* 恢复行高设置，确保内部换行有足够间距 */
                 }
 
                 .ProseMirror ul[data-type="taskList"] li::before {
@@ -496,72 +451,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
 
                 .dark .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
                     color: #9ca3af;
-                }
-
-                /* 移动端全局优化 */
-                @media (max-width: 767px) {
-                    .ProseMirror h2 {
-                        font-size: 1.8em;
-                        margin: 1rem 0 0.5rem 0;
-                    }
-
-                    .ProseMirror h3 {
-                        font-size: 1.5em;
-                        margin: 0.9rem 0 0.4rem 0;
-                    }
-
-                    .ProseMirror h4 {
-                        font-size: 1.3em;
-                        margin: 0.8rem 0 0.3rem 0;
-                    }
-
-                    .ProseMirror h5 {
-                        font-size: 1.2em;
-                        margin: 0.7rem 0 0.3rem 0;
-                    }
-
-                    .ProseMirror h6 {
-                        font-size: 1.1em;
-                        margin: 0.6rem 0 0.2rem 0;
-                    }
-
-                    .ProseMirror ul, .ProseMirror ol {
-                        margin: 0.75rem 0;
-                    }
-
-                    .ProseMirror ul li, .ProseMirror ol li {
-                        padding-left: 1.2rem;
-                        margin: 0.2rem 0;
-                        word-wrap: break-word;
-                        overflow-wrap: break-word;
-                    }
-
-                    .ProseMirror blockquote {
-                        padding-left: 0.75rem;
-                        margin: 0.75rem 0;
-                        font-size: 0.95rem;
-                    }
-
-                    .ProseMirror pre {
-                        padding: 0.75rem;
-                        margin: 0.75rem 0;
-                        overflow-x: auto;
-                        font-size: 0.85rem;
-                    }
-
-                    .ProseMirror code {
-                        font-size: 0.8em;
-                        padding: 0.15rem 0.3rem;
-                    }
-
-                    .ProseMirror ul[data-type="taskList"] li {
-                        padding-left: 1.2rem;
-                        margin: 0.2rem 0;
-                    }
-
-                    .ProseMirror ul[data-type="taskList"] li > label {
-                        width: 1.2rem;
-                    }
                 }
             `}</style>
         </div>

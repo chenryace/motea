@@ -64,7 +64,7 @@ const TiptapMainEditor: FC<
     }
 
     const articleClassName =
-        className || `pt-16 md:pt-40 px-4 md:px-6 m-auto h-full ${editorWidthClass}`;
+        className || `pt-16 md:pt-40 px-6 m-auto h-full ${editorWidthClass}`;
 
     return (
         <article className={articleClassName}>
@@ -78,7 +78,7 @@ const TiptapMainEditor: FC<
                 onClickLink={onClickLink}
                 onHoverLink={onHoverLink}
                 isPreview={isPreview}
-                className="px-2 md:px-0"
+                className="px-4 md:px-0"
                 {...props}
             />
             {!isPreview && <Backlinks />}
