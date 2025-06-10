@@ -55,7 +55,7 @@ export interface PostgreSQLStoreConfiguration {
     type: 'postgresql';
     connectionString: string;
     prefix: string;
-    provider?: 'self-hosted' | 'supabase';
+    provider?: 'self-hosted' | 'supabase' | 'neon';
     ssl?: boolean;
 }
 
@@ -261,23 +261,36 @@ export function loadConfigAndListErrors(): {
     const postgresUrl = env.getEnvRaw('DATABASE_URL', false);
     const supabaseUrl = env.getEnvRaw('SUPABASE_URL', false);
     const supabaseKey = env.getEnvRaw('SUPABASE_ANON_KEY', false);
+    const dbProvider = env.getEnvRaw('DB_PROVIDER', false);
 
-    let provider: 'self-hosted' | 'supabase' = 'self-hosted';
+    let provider: 'self-hosted' | 'supabase' | 'neon' = 'self-hosted';
     let connectionString = postgresUrl || '';
     let ssl = false;
 
-    if (supabaseUrl && supabaseKey) {
-        provider = 'supabase';
-        connectionString = `postgresql://postgres:[YOUR-PASSWORD]@${supabaseUrl.replace('https://', '').replace('http://', '')}:5432/postgres`;
-        ssl = true;
-
-        if (postgresUrl && postgresUrl.includes('supabase')) {
-            connectionString = postgresUrl;
-        }
+    // Auto-detect provider based on connection string or explicit provider setting
+    if (dbProvider) {
+        provider = dbProvider as 'self-hosted' | 'supabase' | 'neon';
     } else if (postgresUrl) {
-        provider = 'self-hosted';
+        if (postgresUrl.includes('neon.tech') || postgresUrl.includes('neon.')) {
+            provider = 'neon';
+        } else if (postgresUrl.includes('supabase.co') || postgresUrl.includes('supabase.')) {
+            provider = 'supabase';
+        } else {
+            provider = 'self-hosted';
+        }
+    }
+
+    // Configure based on provider
+    if (supabaseUrl && supabaseKey && provider === 'supabase') {
+        connectionString = postgresUrl || `postgresql://postgres:[YOUR-PASSWORD]@${supabaseUrl.replace('https://', '').replace('http://', '')}:5432/postgres`;
+        ssl = true;
+    } else if (postgresUrl) {
         connectionString = postgresUrl;
-        ssl = postgresUrl.includes('sslmode=require') || postgresUrl.includes('ssl=true');
+        // Auto-detect SSL requirements
+        ssl = postgresUrl.includes('sslmode=require') ||
+              postgresUrl.includes('ssl=true') ||
+              provider === 'neon' ||
+              provider === 'supabase';
     }
 
     store = {

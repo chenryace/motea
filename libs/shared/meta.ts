@@ -16,7 +16,7 @@ export enum NOTE_PINNED {
 export enum EDITOR_SIZE {
     SMALL,
     LARGE,
-    AS_WIDE_AS_POSSIBLE = 2
+    FULL = 2
 }
 
 export const PAGE_META_KEY = <const>[
