@@ -212,8 +212,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     line-height: 1.7;
                     font-size: 1rem;
                     color: inherit;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                     -webkit-spellcheck: false;
                     -moz-spellcheck: false;
                     -ms-spellcheck: false;
@@ -223,8 +221,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 .ProseMirror p {
                     margin: 1rem 0;
                     line-height: 1.7;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h1 {
@@ -232,8 +228,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1.5rem 0 1rem 0;
                     line-height: 1.2;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h2 {
@@ -241,8 +235,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1.3rem 0 0.8rem 0;
                     line-height: 1.3;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h3 {
@@ -250,8 +242,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1.2rem 0 0.6rem 0;
                     line-height: 1.4;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h4 {
@@ -259,8 +249,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1.1rem 0 0.5rem 0;
                     line-height: 1.4;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h5 {
@@ -268,8 +256,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 1rem 0 0.4rem 0;
                     line-height: 1.5;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror h6 {
@@ -277,8 +263,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                     font-weight: bold;
                     margin: 0.9rem 0 0.3rem 0;
                     line-height: 1.5;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
                 }
 
                 .ProseMirror ul {
@@ -413,11 +397,9 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 .ProseMirror ul[data-type="taskList"] li {
                     position: relative;
                     padding-left: 1.5rem; /* 与普通列表保持一致 */
-                    margin: 1rem 0; /* 与普通列表保持一致 */
+                    margin: 10.rem 0; /* 增加行距，使其与普通列表视觉效果一致 */
                     display: block; /* 使用 block 而不是 flex */
-                    line-height: 1.7; /* 恢复行高设置，确保内部换行有足够间距 */
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
+                    line-height: 4; /* 恢复行高设置，确保内部换行有足够间距 */
                 }
 
                 .ProseMirror ul[data-type="taskList"] li::before {
