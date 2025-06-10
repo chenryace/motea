@@ -55,7 +55,7 @@ const TiptapMainEditor: FC<
         case EDITOR_SIZE.LARGE:
             editorWidthClass = 'max-w-4xl';
             break;
-        case EDITOR_SIZE.AS_WIDE_AS_POSSIBLE:
+        case EDITOR_SIZE.FULL:
             editorWidthClass = 'max-w-full mx-4';
             break;
         default:

@@ -29,8 +29,8 @@ const EditorWidthSelect: FC = () => {
             value: EDITOR_SIZE.LARGE
         },
         {
-            text: t("As wide as possible"),
-            value: EDITOR_SIZE.AS_WIDE_AS_POSSIBLE
+            text: t("Full"),
+            value: EDITOR_SIZE.FULL
         }
     ];
 
