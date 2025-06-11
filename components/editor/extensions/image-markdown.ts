@@ -19,6 +19,8 @@ import Image from '@tiptap/extension-image';
 import { nodeInputRule, inputRule } from '@tiptap/core';
 
 export const ImageMarkdown = Image.extend({
+    priority: 900, // 低于 markdown 扩展 (1000)，避免输入规则冲突
+
     addInputRules() {
         return [
             nodeInputRule({
