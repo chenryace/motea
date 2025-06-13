@@ -69,8 +69,14 @@ const useTiptapEditor = (initNote?: NoteModel) => {
             const isNew = has(router.query, 'new');
 
             try {
+                // 🔑 修复：确保获取最新的完整数据
                 const localNote = await noteCache.getItem(note.id);
-                const noteToSave = localNote || note;
+                let noteToSave = localNote || note;
+
+                // 🔑 额外安全检查：确保内容完整性
+                if (!noteToSave.content && note?.content) {
+                    noteToSave = { ...noteToSave, content: note.content };
+                }
 
                 if (isNew) {
                     const noteData = {
@@ -223,13 +229,22 @@ const useTiptapEditor = (initNote?: NoteModel) => {
 
     // Function to handle title changes specifically
     const onTitleChange = useCallback(
-        (title: string): void => {
-            saveToIndexedDB({
-                title,
-                updated_at: new Date().toISOString()
-            })?.catch((v) => console.error('Error whilst saving title to IndexedDB: %O', v));
+        async (title: string): Promise<void> => {
+            try {
+                // 🔑 修复：标题变更时，确保保留现有内容
+                const currentNote = await noteCache.getItem(note?.id || '');
+                const currentContent = currentNote?.content || note?.content || '\n';
+
+                await saveToIndexedDB({
+                    title,
+                    content: currentContent, // 🔑 关键：保存现有内容
+                    updated_at: new Date().toISOString()
+                });
+            } catch (error) {
+                console.error('Error whilst saving title to IndexedDB:', error);
+            }
         },
-        [saveToIndexedDB]
+        [saveToIndexedDB, note?.id, note?.content]
     );
 
     return {
