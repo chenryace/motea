@@ -108,7 +108,7 @@ const useTiptapEditor = (initNote?: NoteModel) => {
                     }
                 }
 
-                // 更新noteToSave的标题
+                // 🔑 统一在保存时处理时间戳 - 无论是否调用了 parseMarkdownTitle
                 noteToSave = {
                     ...noteToSave,
                     title: finalTitle,
@@ -210,15 +210,14 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         setBackLinks(linkNotes);
     }, [note?.id]);
 
-    // 简化的编辑器变化处理逻辑 - 只保存内容，标题处理移到 syncToServer
+    // 简化的编辑器变化处理逻辑 - 只保存内容，时间戳移到 syncToServer
     const originalOnEditorChange = useCallback(
         async (value: () => string): Promise<void> => {
             const content = value();
 
-            // 只保存内容，标题处理移到 syncToServer 时进行
+            // 只保存内容，时间戳在 syncToServer 时统一处理
             await saveToIndexedDB({
-                content,
-                updated_at: new Date().toISOString()
+                content
             });
         },
         [saveToIndexedDB]
@@ -231,8 +230,7 @@ const useTiptapEditor = (initNote?: NoteModel) => {
     const onTitleChange = useCallback(
         (title: string): void => {
             saveToIndexedDB({
-                title,
-                updated_at: new Date().toISOString()
+                title
             })?.catch((v) => console.error('Error whilst saving title to IndexedDB: %O', v));
         },
         [saveToIndexedDB]
