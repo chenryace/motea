@@ -13,7 +13,7 @@ import {
 import TiptapEditorState from 'libs/web/state/tiptap-editor';
 
 const EditTitle: FC<{ readOnly?: boolean }> = ({ readOnly }) => {
-    const { editorEl, onTitleChange: editorOnTitleChange, note } = TiptapEditorState.useContainer();
+    const { editorEl, saveToIndexedDB, note } = TiptapEditorState.useContainer();
     const router = useRouter();
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const onInputTitle = useCallback(
@@ -30,9 +30,10 @@ const EditTitle: FC<{ readOnly?: boolean }> = ({ readOnly }) => {
     const onTitleChange = useCallback(
         (event: ChangeEvent<HTMLTextAreaElement>) => {
             const title = event.target.value;
-            editorOnTitleChange(title); // 🔑 使用编辑器状态的 onTitleChange
+            saveToIndexedDB({ title })
+                ?.catch((v) => console.error('Error whilst changing title: %O', v));
         },
-        [editorOnTitleChange]
+        [saveToIndexedDB]
     );
 
     const autoFocus = useMemo(() => has(router.query, 'new'), [router.query]);
