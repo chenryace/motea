@@ -229,22 +229,13 @@ const useTiptapEditor = (initNote?: NoteModel) => {
 
     // Function to handle title changes specifically
     const onTitleChange = useCallback(
-        async (title: string): Promise<void> => {
-            try {
-                // 🔑 修复：获取当前完整数据，确保不丢失内容
-                const currentNote = await noteCache.getItem(note?.id || '');
-                const currentContent = currentNote?.content || note?.content || '\n';
-
-                await saveToIndexedDB({
-                    title,
-                    content: currentContent, // 🔑 保持现有内容
-                    updated_at: new Date().toISOString()
-                });
-            } catch (error) {
-                console.error('Error whilst saving title to IndexedDB:', error);
-            }
+        (title: string): void => {
+            saveToIndexedDB({
+                title,
+                updated_at: new Date().toISOString()
+            })?.catch((v) => console.error('Error whilst saving title to IndexedDB: %O', v));
         },
-        [saveToIndexedDB, note?.id, note?.content]
+        [saveToIndexedDB]
     );
 
     return {
