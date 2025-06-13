@@ -159,7 +159,8 @@ const useTiptapEditor = (initNote?: NoteModel) => {
                 if (isNew) {
                     const noteData = {
                         ...noteToSave,
-                        pid: (router.query.pid as string) || ROOT_ID
+                        // 🔑 修复：保持原有的 pid，特别是每日笔记的 daily_root_id
+                        pid: noteToSave.pid || (router.query.pid as string) || ROOT_ID
                     };
 
                     const item = await createNote(noteData);
