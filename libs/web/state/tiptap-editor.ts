@@ -69,51 +69,8 @@ const useTiptapEditor = (initNote?: NoteModel) => {
             const isNew = has(router.query, 'new');
 
             try {
-                // 获取IndexedDB中的最新数据
                 const localNote = await noteCache.getItem(note.id);
-                let noteToSave = localNote || note;
-
-                // 🔑 在保存时处理标题逻辑
-                let finalTitle = '';
-
-                // 获取当前标题输入框的值
-                const titleInput = document.querySelector('h1 textarea') as HTMLTextAreaElement;
-                const currentTitle = titleInput?.value?.trim() || '';
-
-                if (note?.isDailyNote) {
-                    // 每日笔记：保持原有标题逻辑不变
-                    finalTitle = currentTitle || noteToSave.title || note.title || 'Daily Note';
-                } else {
-                    // 普通笔记：检查是否需要使用 parseMarkdownTitle
-                    if (currentTitle &&
-                        currentTitle !== 'Untitled' &&
-                        currentTitle !== 'New Page' &&
-                        currentTitle !== '') {
-                        // 用户已输入标题，使用用户输入的标题
-                        finalTitle = currentTitle;
-                    } else {
-                        // 检查IndexedDB中是否有保存的标题
-                        const savedTitle = noteToSave.title;
-                        if (savedTitle &&
-                            savedTitle !== 'Untitled' &&
-                            savedTitle !== 'New Page' &&
-                            savedTitle !== '') {
-                            finalTitle = savedTitle;
-                        } else {
-                            // 🔑 只有在确实没有标题时才使用 parseMarkdownTitle
-                            const content = noteToSave.content || '\n';
-                            const parsed = parseMarkdownTitle(content);
-                            finalTitle = parsed.title || 'Untitled';
-                        }
-                    }
-                }
-
-                // 🔑 统一在保存时处理时间戳 - 无论是否调用了 parseMarkdownTitle
-                noteToSave = {
-                    ...noteToSave,
-                    title: finalTitle,
-                    updated_at: new Date().toISOString()
-                };
+                const noteToSave = localNote || note;
 
                 if (isNew) {
                     const noteData = {
@@ -210,17 +167,55 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         setBackLinks(linkNotes);
     }, [note?.id]);
 
-    // 简化的编辑器变化处理逻辑 - 只保存内容，时间戳移到 syncToServer
+    // 原始的编辑器变化处理逻辑
     const originalOnEditorChange = useCallback(
         async (value: () => string): Promise<void> => {
             const content = value();
 
-            // 只保存内容，时间戳在 syncToServer 时统一处理
-            await saveToIndexedDB({
-                content
-            });
+            let title: string;
+            if (note?.isDailyNote) {
+                title = note.title;
+            } else {
+                let currentTitle = '';
+
+                const titleInput = document.querySelector('h1 textarea') as HTMLTextAreaElement;
+                if (titleInput && titleInput.value) {
+                    currentTitle = titleInput.value.trim();
+                } else {
+                    if (note?.id) {
+                        try {
+                            const localNote = await noteCache.getItem(note.id);
+                            currentTitle = localNote?.title || '';
+                        } catch (error) {
+                            currentTitle = note?.title || '';
+                        }
+                    } else {
+                        currentTitle = note?.title || '';
+                    }
+                }
+
+                if (!currentTitle ||
+                    currentTitle === 'Untitled' ||
+                    currentTitle === 'New Page' ||
+                    currentTitle === '' ||
+                    (currentTitle.includes('<') && currentTitle.includes('>'))) {
+
+                    const parsed = parseMarkdownTitle(content);
+                    title = parsed.title || 'Untitled'; // Use 'Untitled' if no title found
+                } else {
+                    title = currentTitle;
+                }
+            }
+
+            await saveToIndexedDB({ content, title });
+            // Save to IndexedDB immediately for local persistence
+            saveToIndexedDB({
+                content,
+                title,
+                updated_at: new Date().toISOString()
+            })?.catch((v) => console.error('Error whilst saving to IndexedDB: %O', v));
         },
-        [saveToIndexedDB]
+        [saveToIndexedDB, note?.isDailyNote, note?.id]
     );
 
     // 使用 IME 安全的包装器，新版本不依赖 debounce，基于 composition 状态精确控制
@@ -230,7 +225,8 @@ const useTiptapEditor = (initNote?: NoteModel) => {
     const onTitleChange = useCallback(
         (title: string): void => {
             saveToIndexedDB({
-                title
+                title,
+                updated_at: new Date().toISOString()
             })?.catch((v) => console.error('Error whilst saving title to IndexedDB: %O', v));
         },
         [saveToIndexedDB]
