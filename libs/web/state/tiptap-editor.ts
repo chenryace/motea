@@ -69,51 +69,53 @@ const useTiptapEditor = (initNote?: NoteModel) => {
             const isNew = has(router.query, 'new');
 
             try {
-                // 获取IndexedDB中的最新数据
+                // 🔑 关键修复：获取最新的完整数据，确保标题和内容都是最新的
                 const localNote = await noteCache.getItem(note.id);
                 let noteToSave = localNote || note;
 
-                // 🔑 在保存时处理标题逻辑
-                let finalTitle = '';
-
-                // 获取当前标题输入框的值
+                // 🔑 从DOM获取最新的标题
                 const titleInput = document.querySelector('h1 textarea') as HTMLTextAreaElement;
-                const currentTitle = titleInput?.value?.trim() || '';
+                let currentTitle = titleInput?.value?.trim() || '';
 
+                // 🔑 从IndexedDB获取最新的内容
+                let currentContent = noteToSave.content || '\n';
+
+                // 🔑 处理标题逻辑
                 if (note?.isDailyNote) {
-                    // 每日笔记：保持原有标题逻辑不变
-                    finalTitle = currentTitle || noteToSave.title || note.title || 'Daily Note';
+                    // 每日笔记：保持原有标题
+                    currentTitle = currentTitle || noteToSave.title || note.title || 'Daily Note';
                 } else {
                     // 普通笔记：检查是否需要使用 parseMarkdownTitle
-                    if (currentTitle &&
-                        currentTitle !== 'Untitled' &&
-                        currentTitle !== 'New Page' &&
-                        currentTitle !== '') {
-                        // 用户已输入标题，使用用户输入的标题
-                        finalTitle = currentTitle;
-                    } else {
+                    if (!currentTitle ||
+                        currentTitle === 'Untitled' ||
+                        currentTitle === 'New Page' ||
+                        currentTitle === '') {
+
                         // 检查IndexedDB中是否有保存的标题
                         const savedTitle = noteToSave.title;
                         if (savedTitle &&
                             savedTitle !== 'Untitled' &&
                             savedTitle !== 'New Page' &&
                             savedTitle !== '') {
-                            finalTitle = savedTitle;
+                            currentTitle = savedTitle;
                         } else {
                             // 🔑 只有在确实没有标题时才使用 parseMarkdownTitle
-                            const content = noteToSave.content || '\n';
-                            const parsed = parseMarkdownTitle(content);
-                            finalTitle = parsed.title || 'Untitled';
+                            const parsed = parseMarkdownTitle(currentContent);
+                            currentTitle = parsed.title || 'Untitled';
                         }
                     }
                 }
 
-                // 更新noteToSave的标题
+                // 🔑 构建最终要保存的数据，确保标题和内容都是最新的
                 noteToSave = {
                     ...noteToSave,
-                    title: finalTitle,
+                    title: currentTitle,
+                    content: currentContent,
                     updated_at: new Date().toISOString()
                 };
+
+                // 🔑 在保存前更新本地缓存，确保数据一致性
+                await noteCache.setItem(note.id, noteToSave);
 
                 if (isNew) {
                     const noteData = {
@@ -229,22 +231,13 @@ const useTiptapEditor = (initNote?: NoteModel) => {
 
     // Function to handle title changes specifically
     const onTitleChange = useCallback(
-        async (title: string): Promise<void> => {
-            try {
-                // 🔑 修复：获取当前完整数据，确保不丢失内容
-                const currentNote = await noteCache.getItem(note?.id || '');
-                const currentContent = currentNote?.content || note?.content || '\n';
-
-                await saveToIndexedDB({
-                    title,
-                    content: currentContent, // 🔑 保持现有内容
-                    updated_at: new Date().toISOString()
-                });
-            } catch (error) {
-                console.error('Error whilst saving title to IndexedDB:', error);
-            }
+        (title: string): void => {
+            saveToIndexedDB({
+                title,
+                updated_at: new Date().toISOString()
+            })?.catch((v) => console.error('Error whilst saving title to IndexedDB: %O', v));
         },
-        [saveToIndexedDB, note?.id, note?.content]
+        [saveToIndexedDB]
     );
 
     return {
