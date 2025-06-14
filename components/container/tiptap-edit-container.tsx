@@ -53,11 +53,11 @@ const TiptapEditContainer: FC = () => {
 
                 if (dailyDate && /^\d{4}-\d{1,2}-\d{1,2}$/.test(dailyDate)) {
                     initNote({
-                        id, // 现在这个id是随机生成的，不再是日期
-                        title: dailyDate, // 标题仍然使用日期
+                        id,
+                        title: dailyDate,
                         content: '\n',
                         pid: settings.daily_root_id,
-                        isDailyNote: true,
+                        isDailyNote: true, 
                     });
                 } else {
                     const cachedNote = await noteCache.getItem(id);
