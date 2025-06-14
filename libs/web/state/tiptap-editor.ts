@@ -61,6 +61,15 @@ const useTiptapEditor = (initNote?: NoteModel) => {
             const baseNote = existingNote || note;
 
             const updatedNote = { ...baseNote, ...data };
+
+            // 调试信息：记录保存的内容
+            console.log('💾 Saving to IndexedDB:', {
+                noteId: note.id,
+                contentLength: data.content?.length || 0,
+                title: data.title,
+                hasContent: !!data.content
+            });
+
             await noteCache.setItem(note.id, updatedNote);
         },
         [note]
@@ -175,6 +184,12 @@ const useTiptapEditor = (initNote?: NoteModel) => {
     const originalOnEditorChange = useCallback(
         async (value: () => string): Promise<void> => {
             const content = value();
+
+            // 调试信息：记录编辑器变化
+            console.log('✏️ Editor content changed:', {
+                contentLength: content.length,
+                contentPreview: content.substring(0, 100) + (content.length > 100 ? '...' : '')
+            });
 
             let title: string;
             if (note?.isDailyNote) {
