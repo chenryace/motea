@@ -74,7 +74,28 @@ const useTiptapEditor = (initNote?: NoteModel) => {
 
             try {
                 const localNote = await noteCache.getItem(note.id);
-                const noteToSave = localNote || note;
+                let noteToSave = localNote || note;
+
+                // 在上传前处理标题逻辑
+                let finalTitle = noteToSave.title;
+
+                // 如果不是每日笔记且标题为空，从内容中解析标题
+                if (!note?.isDailyNote && (!finalTitle ||
+                    finalTitle === 'Untitled' ||
+                    finalTitle === 'New Page' ||
+                    finalTitle === '' ||
+                    (finalTitle.includes('<') && finalTitle.includes('>')))) {
+
+                    const parsed = parseMarkdownTitle(noteToSave.content || '');
+                    finalTitle = parsed.title || 'Untitled';
+                }
+
+                // 准备最终的笔记数据，包含处理后的标题和更新时间
+                noteToSave = {
+                    ...noteToSave,
+                    title: finalTitle,
+                    updated_at: new Date().toISOString()
+                };
 
                 if (isNew) {
                     const noteData = {
@@ -171,65 +192,37 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         setBackLinks(linkNotes);
     }, [note?.id]);
 
-    // 原始的编辑器变化处理逻辑
+    // 编辑器变化处理逻辑 - 主要处理内容，但需要保护每日笔记标题
     const originalOnEditorChange = useCallback(
         async (value: () => string): Promise<void> => {
             const content = value();
 
-            let title: string;
+            // 对于每日笔记，需要确保标题不被覆盖
             if (note?.isDailyNote) {
-                title = note.title;
+                // 每日笔记：保存内容，同时确保标题保持为日期
+                await saveToIndexedDB({
+                    content,
+                    title: note.title // 保持原有的日期标题
+                });
             } else {
-                let currentTitle = '';
-
-                const titleInput = document.querySelector('h1 textarea') as HTMLTextAreaElement;
-                if (titleInput && titleInput.value) {
-                    currentTitle = titleInput.value.trim();
-                } else {
-                    if (note?.id) {
-                        try {
-                            const localNote = await noteCache.getItem(note.id);
-                            currentTitle = localNote?.title || '';
-                        } catch (error) {
-                            currentTitle = note?.title || '';
-                        }
-                    } else {
-                        currentTitle = note?.title || '';
-                    }
-                }
-
-                if (!currentTitle ||
-                    currentTitle === 'Untitled' ||
-                    currentTitle === 'New Page' ||
-                    currentTitle === '' ||
-                    (currentTitle.includes('<') && currentTitle.includes('>'))) {
-
-                    const parsed = parseMarkdownTitle(content);
-                    title = parsed.title || 'Untitled'; // Use 'Untitled' if no title found
-                } else {
-                    title = currentTitle;
-                }
+                // 普通笔记：只保存内容，标题处理留给上传时或onTitleChange
+                await saveToIndexedDB({
+                    content
+                });
             }
-
-            // Save to IndexedDB immediately for local persistence
-            await saveToIndexedDB({
-                content,
-                title,
-                updated_at: new Date().toISOString()
-            });
         },
-        [saveToIndexedDB, note?.isDailyNote, note?.id]
+        [saveToIndexedDB, note?.isDailyNote, note?.title]
     );
 
     // 使用 IME 安全的包装器
     const onEditorChange = wrapEditorChangeForIME(originalOnEditorChange, 600);
 
-    // Function to handle title changes specifically
+    // 标题变化处理逻辑 - 只处理标题
     const onTitleChange = useCallback(
         (title: string): void => {
+            // 只保存标题，不处理时间戳
             saveToIndexedDB({
-                title,
-                updated_at: new Date().toISOString()
+                title
             })?.catch((v) => console.error('Error whilst saving title to IndexedDB: %O', v));
         },
         [saveToIndexedDB]
