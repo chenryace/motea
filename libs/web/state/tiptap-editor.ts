@@ -56,7 +56,11 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         async (data: Partial<NoteModel>) => {
             if (!note?.id) return;
 
-            const updatedNote = { ...note, ...data };
+            // 从 IndexedDB 获取最新数据作为基础，避免覆盖已保存的数据
+            const existingNote = await noteCache.getItem(note.id);
+            const baseNote = existingNote || note;
+
+            const updatedNote = { ...baseNote, ...data };
             await noteCache.setItem(note.id, updatedNote);
         },
         [note]
@@ -207,13 +211,12 @@ const useTiptapEditor = (initNote?: NoteModel) => {
                 }
             }
 
-            await saveToIndexedDB({ content, title });
             // Save to IndexedDB immediately for local persistence
-            saveToIndexedDB({
+            await saveToIndexedDB({
                 content,
                 title,
                 updated_at: new Date().toISOString()
-            })?.catch((v) => console.error('Error whilst saving to IndexedDB: %O', v));
+            });
         },
         [saveToIndexedDB, note?.isDailyNote, note?.id]
     );
