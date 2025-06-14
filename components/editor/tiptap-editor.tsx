@@ -15,7 +15,7 @@
  * copies or substantial portions of the Software.
  */
 
-import { useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -34,7 +34,6 @@ import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
 import FloatingToolbar from './floating-toolbar';
-import IMEFix from './extensions/ime-fix';
 
 export interface TiptapEditorProps {
     readOnly?: boolean;
@@ -108,10 +107,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
             SlashCommands.configure({
                 suggestion: suggestion(),
             }),
-            IMEFix.configure({
-                enabled: true,
-                debug: process.env.NODE_ENV === 'development',
-            }),
         ],
         content: value,
         editable: !readOnly,
@@ -148,43 +143,25 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
     useEffect(() => {
         if (editor && value !== undefined) {
             const currentContent = editor.getHTML();
-            const currentMarkdown = editor.storage.markdown?.transformer?.serialize(editor.state.doc);
-
-            console.log('🔄 TiptapEditor content update check:', {
-                value: value,
-                currentContent: currentContent,
-                currentMarkdown: currentMarkdown,
-                valueLength: value.length,
-                currentLength: currentContent.length
-            });
-
-            // 简化比较逻辑，确保新笔记内容能正确设置
-            const shouldUpdate = value !== currentContent && value !== currentMarkdown;
-
-            if (shouldUpdate) {
-                console.log('✅ Updating editor content from:', currentContent, 'to:', value);
-                // 使用 false 参数避免触发 onUpdate 回调，防止循环
+            if (value !== currentContent) {
                 editor.commands.setContent(value, false);
-            } else {
-                console.log('⏭️ Skipping content update - content is the same');
             }
         }
     }, [editor, value]);
 
-    // 稳定化链接点击处理函数，避免频繁重新注册事件监听器
-    const handleClick = useCallback((event: MouseEvent) => {
-        const target = event.target as HTMLElement;
-        if (target.tagName === 'A') {
-            event.preventDefault();
-            const href = target.getAttribute('href');
-            if (href && onClickLink) {
-                onClickLink(href, event);
-            }
-        }
-    }, [onClickLink]);
-
     useEffect(() => {
-        if (editor) {
+        if (editor && onClickLink) {
+            const handleClick = (event: MouseEvent) => {
+                const target = event.target as HTMLElement;
+                if (target.tagName === 'A') {
+                    event.preventDefault();
+                    const href = target.getAttribute('href');
+                    if (href) {
+                        onClickLink(href, event);
+                    }
+                }
+            };
+
             const editorElement = editor.view.dom;
             editorElement.addEventListener('click', handleClick);
 
@@ -192,18 +169,17 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 editorElement.removeEventListener('click', handleClick);
             };
         }
-    }, [editor, handleClick]);
-
-    // 稳定化链接悬停处理函数
-    const handleMouseOver = useCallback((event: MouseEvent) => {
-        const target = event.target as HTMLElement;
-        if (target.tagName === 'A' && onHoverLink) {
-            onHoverLink(event);
-        }
-    }, [onHoverLink]);
+    }, [editor, onClickLink]);
 
     useEffect(() => {
-        if (editor) {
+        if (editor && onHoverLink) {
+            const handleMouseOver = (event: MouseEvent) => {
+                const target = event.target as HTMLElement;
+                if (target.tagName === 'A') {
+                    onHoverLink(event);
+                }
+            };
+
             const editorElement = editor.view.dom;
             editorElement.addEventListener('mouseover', handleMouseOver);
 
@@ -211,7 +187,7 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 editorElement.removeEventListener('mouseover', handleMouseOver);
             };
         }
-    }, [editor, handleMouseOver]);
+    }, [editor, onHoverLink]);
 
     if (!mounted) {
         return null;

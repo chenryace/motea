@@ -33,7 +33,7 @@ const TiptapEditContainer: FC = () => {
     const router = useRouter();
     const { id, pid } = router.query;
     const isNew = has(router.query, 'new');
-    const { note, initNote, findOrCreateNote, fetchNote } = NoteState.useContainer();
+    const { initNote, findOrCreateNote, fetchNote } = NoteState.useContainer();
     const { loadNoteOnDemand } = NoteTreeState.useContainer();
     const {
         settings: { settings },
@@ -48,21 +48,16 @@ const TiptapEditContainer: FC = () => {
         const initializeEditor = async () => {
             if (!id || Array.isArray(id)) return;
 
-            // 🔑 关键修复：检查是否已经在编辑这个笔记
-            if (note?.id === id) {
-                return;
-            }
-
             if (isNew) {
                 const dailyDate = router.query.daily as string;
 
                 if (dailyDate && /^\d{4}-\d{1,2}-\d{1,2}$/.test(dailyDate)) {
                     initNote({
-                        id, // 现在这个id是随机生成的，不再是日期
-                        title: dailyDate, // 标题仍然使用日期
+                        id,
+                        title: dailyDate,
                         content: '\n',
                         pid: settings.daily_root_id,
-                        isDailyNote: true,
+                        isDailyNote: true, 
                     });
                 } else {
                     const cachedNote = await noteCache.getItem(id);
@@ -85,6 +80,7 @@ const TiptapEditContainer: FC = () => {
                     if (noteData) {
                         initNote(noteData);
                     } else {
+                        console.log('🔄 Fallback to direct API call for note:', id);
                         await fetchNote(id);
                     }
                 } catch (error) {
@@ -99,7 +95,6 @@ const TiptapEditContainer: FC = () => {
         id,
         isNew,
         pid,
-        note?.id, // 🔑 添加当前笔记ID作为依赖
         router.query.daily,
         settings.daily_root_id,
         initNote,
