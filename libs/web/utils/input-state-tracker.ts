@@ -50,9 +50,7 @@ export class InputStateTracker {
         document.addEventListener('compositionend', this.handleCompositionEnd.bind(this), true);
         document.addEventListener('keydown', this.handleKeyDown.bind(this), true);
 
-        if (this.options.debug) {
-            console.log('🎯 InputStateTracker: Initialized');
-        }
+
     }
 
     private handleBeforeInput(event: InputEvent) {
@@ -62,14 +60,7 @@ export class InputStateTracker {
         // 检测是否为快速输入
         const isFastTyping = now - this.state.lastInputTime < this.state.fastTypingThreshold;
         
-        if (this.options.debug) {
-            console.log('🎯 InputStateTracker: beforeinput', {
-                inputType,
-                data,
-                isFastTyping,
-                timeSinceLastInput: now - this.state.lastInputTime
-            });
-        }
+
 
         // 更新状态
         this.updateState({
@@ -90,9 +81,7 @@ export class InputStateTracker {
     private handleInput(event: InputEvent) {
         const { inputType, data } = event;
         
-        if (this.options.debug) {
-            console.log('🎯 InputStateTracker: input', { inputType, data });
-        }
+
 
         // 输入事件发生，确保状态为正在输入
         this.updateState({ isTyping: true });
@@ -100,17 +89,13 @@ export class InputStateTracker {
     }
 
     private handleCompositionStart(event: CompositionEvent) {
-        if (this.options.debug) {
-            console.log('🎯 InputStateTracker: composition start');
-        }
+
 
         this.updateState({ isComposing: true });
     }
 
     private handleCompositionEnd(event: CompositionEvent) {
-        if (this.options.debug) {
-            console.log('🎯 InputStateTracker: composition end');
-        }
+
 
         this.updateState({ isComposing: false });
         this.resetTypingTimer();
@@ -141,9 +126,7 @@ export class InputStateTracker {
                 inputBuffer: []
             });
 
-            if (this.options.debug) {
-                console.log('🎯 InputStateTracker: Typing ended');
-            }
+
         }, 200);
     }
 
@@ -160,13 +143,7 @@ export class InputStateTracker {
             }
         });
 
-        // 调试日志
-        if (this.options.debug && this.hasStateChanged(oldState, this.state)) {
-            console.log('🎯 InputStateTracker: State changed', {
-                old: oldState,
-                new: this.state
-            });
-        }
+
     }
 
     private hasStateChanged(oldState: InputState, newState: InputState): boolean {
@@ -231,9 +208,7 @@ export class InputStateTracker {
 
         this.listeners = [];
 
-        if (this.options.debug) {
-            console.log('🎯 InputStateTracker: Destroyed');
-        }
+
     }
 }
 
@@ -245,9 +220,7 @@ let globalInputTracker: InputStateTracker | null = null;
  */
 export function getGlobalInputTracker(): InputStateTracker {
     if (!globalInputTracker) {
-        globalInputTracker = new InputStateTracker({
-            debug: process.env.NODE_ENV === 'development'
-        });
+        globalInputTracker = new InputStateTracker();
     }
     return globalInputTracker;
 }
@@ -270,21 +243,13 @@ export function createSmartOnChange<T extends (...args: any[]) => any>(
     let timeoutId: NodeJS.Timeout | null = null;
 
     const executeCallback = (args: Parameters<T>) => {
-        if (debug) {
-            console.log('🎯 SmartOnChange: Executing callback');
-        }
         return originalCallback(...args);
     };
 
     const smartCallback = (...args: Parameters<T>) => {
         const state = tracker.getState();
         
-        if (debug) {
-            console.log('🎯 SmartOnChange: Called', {
-                shouldPause: tracker.shouldPauseExpensiveOperations(),
-                state
-            });
-        }
+
 
         // 如果正在快速输入，延迟执行
         if (tracker.shouldPauseExpensiveOperations()) {

@@ -63,13 +63,7 @@ const useTiptapEditor = (initNote?: NoteModel) => {
 
             const updatedNote = { ...baseNote, ...data };
 
-            // 调试信息：记录保存的内容
-            console.log('💾 Saving to IndexedDB:', {
-                noteId: note.id,
-                contentLength: data.content?.length || 0,
-                title: data.title,
-                hasContent: !!data.content
-            });
+
 
             await noteCache.setItem(note.id, updatedNote);
         },
@@ -186,11 +180,7 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         async (value: () => string): Promise<void> => {
             const content = value();
 
-            // 调试信息：记录编辑器变化
-            console.log('✏️ Editor content changed:', {
-                contentLength: content.length,
-                contentPreview: content.substring(0, 100) + (content.length > 100 ? '...' : '')
-            });
+
 
             let title: string;
             if (note?.isDailyNote) {
@@ -239,8 +229,7 @@ const useTiptapEditor = (initNote?: NoteModel) => {
 
     // 使用智能onChange包装器 - 基于输入状态智能处理
     const onEditorChange = createSmartOnChange(originalOnEditorChange, {
-        delay: 200, // 快速输入结束后200ms执行
-        debug: process.env.NODE_ENV === 'development'
+        delay: 200 // 快速输入结束后200ms执行
     });
 
     // Function to handle title changes specifically
