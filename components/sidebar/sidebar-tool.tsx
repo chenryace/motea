@@ -16,6 +16,7 @@ import useI18n from 'libs/web/hooks/use-i18n';
 import HeadwayWidget from '@notea/headway-widget';
 import useMounted from 'libs/web/hooks/use-mounted';
 import { useRouter } from 'next/router';
+import NoteTreeState from 'libs/web/state/tree';
 
 const ButtonItem = forwardRef<HTMLDivElement, HTMLProps<HTMLDivElement>>(
     (props, ref) => {
@@ -102,25 +103,27 @@ const ButtonTrash = () => {
 
 const ButtonDailyNotes = () => {
     const { t } = useI18n();
+    const { genNewId } = NoteTreeState.useContainer();
     const today = dayjs().format('YYYY-MM-DD');
-    const href = `/${today}?new=true&daily=${today}`;
     const router = useRouter();
 
+    const handleDailyNoteClick = useCallback(() => {
+        const newId = genNewId();
+        const href = `/${newId}?new=true&daily=${today}`;
+        router.push(href, href, { shallow: true });
+    }, [genNewId, today, router]);
+
     return (
-        <Link href={href} shallow>
-            <a>
-                <HotkeyTooltip
-                    text={t('Daily Notes')}
-                    commandKey
-                    onHotkey={() => router.push(href, href, { shallow: true })}
-                    keys={['shift', 'O']}
-                >
-                    <ButtonItem aria-label="daily notes">
-                        <InboxIcon />
-                    </ButtonItem>
-                </HotkeyTooltip>
-            </a>
-        </Link>
+        <HotkeyTooltip
+            text={t('Daily Notes')}
+            commandKey
+            onHotkey={handleDailyNoteClick}
+            keys={['shift', 'O']}
+        >
+            <ButtonItem aria-label="daily notes" onClick={handleDailyNoteClick}>
+                <InboxIcon />
+            </ButtonItem>
+        </HotkeyTooltip>
     );
 };
 
