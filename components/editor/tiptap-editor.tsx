@@ -133,16 +133,7 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
 
                 // 延迟序列化，避免在快速输入时阻塞
                 const getMarkdown = () => {
-                    const serializeStart = performance.now();
-                    const markdown = editor.storage.markdown?.transformer?.serialize(editor.state.doc) || editor.getHTML();
-                    const serializeTime = performance.now() - serializeStart;
-
-                    // 如果序列化时间超过5ms，记录警告
-                    if (serializeTime > 5) {
-                        console.warn(`🐌 Slow serialization: ${serializeTime.toFixed(2)}ms, doc size: ${editor.state.doc.content.size}`);
-                    }
-
-                    return markdown;
+                    return editor.storage.markdown?.transformer?.serialize(editor.state.doc) || editor.getHTML();
                 };
 
                 onChange(getMarkdown);
