@@ -27,6 +27,7 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
     const router = useRouter();
     const isAutoSavingRef = useRef(false);
     const isLeavingRef = useRef(false);
+    const beforeUnloadTriggeredRef = useRef(false);
 
     const shouldAutoSave = useCallback(() => {
         if (typeof window !== 'undefined' && (window as any).saveButtonStatus) {
@@ -51,8 +52,8 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
         if (!enabled) return;
 
         if (shouldAutoSave()) {
-            // 标记用户正在做离开决定
-            isLeavingRef.current = true;
+            // 标记beforeunload已触发
+            beforeUnloadTriggeredRef.current = true;
 
             // 显示确认对话框
             event.preventDefault();
@@ -98,31 +99,37 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
 
     // 处理页面真正卸载的情况
     const handlePageHide = useCallback((event: PageTransitionEvent) => {
-        // 用户确实选择了离开
+        // 用户确实选择了离开，重置状态
+        beforeUnloadTriggeredRef.current = false;
         isLeavingRef.current = false;
     }, []);
 
-    // 处理页面重新获得焦点（用户选择了"取消"）
-    const handleFocus = useCallback(() => {
-        if (isLeavingRef.current) {
-            // 页面重新获得焦点，说明用户选择了"取消"
-            isLeavingRef.current = false;
-            // 执行自动保存
+    // 处理用户交互（确认用户选择了"取消"）
+    const handleUserInteraction = useCallback(() => {
+        if (beforeUnloadTriggeredRef.current) {
+            // beforeunload触发后，如果用户还能进行交互，说明选择了"取消"
+            beforeUnloadTriggeredRef.current = false;
             performAutoSave();
         }
     }, [performAutoSave]);
 
     // 处理页面焦点变化
     const handleVisibilityChange = useCallback(() => {
-        if (document.visibilityState === 'hidden' && isLeavingRef.current) {
+        if (document.visibilityState === 'hidden') {
             // 页面变为隐藏状态，用户选择了离开
+            beforeUnloadTriggeredRef.current = false;
             isLeavingRef.current = false;
+        } else if (document.visibilityState === 'visible' && beforeUnloadTriggeredRef.current) {
+            // 页面重新可见，且之前触发过beforeunload，说明用户选择了"取消"
+            beforeUnloadTriggeredRef.current = false;
+            performAutoSave();
         }
-    }, []);
+    }, [performAutoSave]);
 
     // 处理页面真正卸载（最终保险）
     const handleUnload = useCallback(() => {
         // 页面真正卸载，用户确实选择了离开
+        beforeUnloadTriggeredRef.current = false;
         isLeavingRef.current = false;
     }, []);
 
@@ -132,17 +139,27 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
         window.addEventListener('beforeunload', handleBeforeUnload);
         window.addEventListener('pagehide', handlePageHide);
         window.addEventListener('unload', handleUnload);
-        window.addEventListener('focus', handleFocus);
         document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // 监听多种用户交互事件来确认用户选择了"取消"
+        document.addEventListener('click', handleUserInteraction);
+        document.addEventListener('keydown', handleUserInteraction);
+        document.addEventListener('scroll', handleUserInteraction);
+        document.addEventListener('mousemove', handleUserInteraction);
 
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
             window.removeEventListener('pagehide', handlePageHide);
             window.removeEventListener('unload', handleUnload);
-            window.removeEventListener('focus', handleFocus);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+            // 移除用户交互事件监听器
+            document.removeEventListener('click', handleUserInteraction);
+            document.removeEventListener('keydown', handleUserInteraction);
+            document.removeEventListener('scroll', handleUserInteraction);
+            document.removeEventListener('mousemove', handleUserInteraction);
         };
-    }, [enabled, handleBeforeUnload, handlePageHide, handleUnload, handleFocus, handleVisibilityChange]);
+    }, [enabled, handleBeforeUnload, handlePageHide, handleUnload, handleVisibilityChange, handleUserInteraction]);
 
     useEffect(() => {
         if (!enabled) return;
