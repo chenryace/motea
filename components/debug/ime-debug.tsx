@@ -5,6 +5,7 @@
 
 import { FC, useState, useEffect } from 'react';
 import { getIMEDebugInfo, isCurrentlyComposing } from 'libs/web/utils/simple-ime-fix';
+import { getGlobalInputTracker, InputState } from 'libs/web/utils/input-state-tracker';
 
 interface IMEDebugProps {
     enabled?: boolean;
@@ -23,6 +24,15 @@ const IMEDebug: FC<IMEDebugProps> = ({
         lastUpdate: Date.now(),
     });
 
+    const [inputState, setInputState] = useState<InputState>({
+        isTyping: false,
+        isComposing: false,
+        isDeleting: false,
+        lastInputTime: 0,
+        inputBuffer: [],
+        fastTypingThreshold: 100
+    });
+
     const [eventLog, setEventLog] = useState<string[]>([]);
 
     useEffect(() => {
@@ -36,6 +46,12 @@ const IMEDebug: FC<IMEDebugProps> = ({
                 lastUpdate: Date.now(),
             });
         };
+
+        // 订阅输入状态变化
+        const inputTracker = getGlobalInputTracker();
+        const unsubscribe = inputTracker.subscribe((state) => {
+            setInputState(state);
+        });
 
         // 高频更新调试信息
         const interval = setInterval(updateDebugInfo, 100);
@@ -64,6 +80,7 @@ const IMEDebug: FC<IMEDebugProps> = ({
 
         return () => {
             clearInterval(interval);
+            unsubscribe();
             document.removeEventListener('compositionstart', logCompositionEvent('COMP_START'), true);
             document.removeEventListener('compositionupdate', logCompositionEvent('COMP_UPDATE'), true);
             document.removeEventListener('compositionend', logCompositionEvent('COMP_END'), true);
@@ -82,11 +99,31 @@ const IMEDebug: FC<IMEDebugProps> = ({
 
     return (
         <div className={`fixed ${positionClasses[position]} z-50 bg-black bg-opacity-80 text-white text-xs p-3 rounded-lg font-mono max-w-xs`}>
-            <div className="mb-2 font-bold text-yellow-400">🚀 Modern IME Debug</div>
-            
+            <div className="mb-2 font-bold text-yellow-400">🚀 Smart Input Debug</div>
+
             <div className="space-y-1">
+                <div className={`flex justify-between ${inputState.isTyping ? 'text-red-400' : 'text-green-400'}`}>
+                    <span>输入状态:</span>
+                    <span>{inputState.isTyping ? '正在输入' : '空闲'}</span>
+                </div>
+
+                <div className={`flex justify-between ${inputState.isComposing ? 'text-red-400' : 'text-gray-400'}`}>
+                    <span>组合输入:</span>
+                    <span>{inputState.isComposing ? 'ON' : 'OFF'}</span>
+                </div>
+
+                <div className={`flex justify-between ${inputState.isDeleting ? 'text-orange-400' : 'text-gray-400'}`}>
+                    <span>删除中:</span>
+                    <span>{inputState.isDeleting ? 'ON' : 'OFF'}</span>
+                </div>
+
+                <div className="flex justify-between text-blue-400">
+                    <span>输入间隔:</span>
+                    <span>{Date.now() - inputState.lastInputTime}ms</span>
+                </div>
+
                 <div className={`flex justify-between ${debugInfo.isComposing ? 'text-red-400' : 'text-green-400'}`}>
-                    <span>状态:</span>
+                    <span>IME状态:</span>
                     <span>{debugInfo.isComposing ? '输入中' : '空闲'}</span>
                 </div>
                 

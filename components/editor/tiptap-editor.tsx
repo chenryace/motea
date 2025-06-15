@@ -124,10 +124,28 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 autocomplete: 'off',
             },
         },
-        onUpdate: ({ editor }) => {
+        onUpdate: ({ editor, transaction }) => {
             if (onChange) {
-                const markdown = editor.storage.markdown?.transformer?.serialize(editor.state.doc) || editor.getHTML();
-                onChange(() => markdown);
+                // 只在文档真正变化时才处理
+                if (!transaction.docChanged) {
+                    return;
+                }
+
+                // 延迟序列化，避免在快速输入时阻塞
+                const getMarkdown = () => {
+                    const serializeStart = performance.now();
+                    const markdown = editor.storage.markdown?.transformer?.serialize(editor.state.doc) || editor.getHTML();
+                    const serializeTime = performance.now() - serializeStart;
+
+                    // 如果序列化时间超过5ms，记录警告
+                    if (serializeTime > 5) {
+                        console.warn(`🐌 Slow serialization: ${serializeTime.toFixed(2)}ms, doc size: ${editor.state.doc.content.size}`);
+                    }
+
+                    return markdown;
+                };
+
+                onChange(getMarkdown);
             }
         },
         onCreate: ({ editor }) => {
