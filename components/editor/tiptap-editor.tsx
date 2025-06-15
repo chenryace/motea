@@ -33,6 +33,7 @@ import MarkdownExtension, { CustomHeading } from './extensions/markdown';
 import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
+import IMEFix from './extensions/ime-fix';
 import FloatingToolbar from './floating-toolbar';
 
 export interface TiptapEditorProps {
@@ -106,6 +107,11 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
             MarkdownExtension,
             SlashCommands.configure({
                 suggestion: suggestion(),
+            }),
+            // IME 输入法优化扩展
+            IMEFix.configure({
+                enabled: true,
+                debug: process.env.NODE_ENV === 'development', // 开发环境启用调试
             }),
         ],
         content: value,
