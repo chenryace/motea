@@ -85,13 +85,7 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                         beforeinput: (view, event) => {
                             const { inputType, data } = event;
 
-                            if (this.options.debug) {
-                                console.log('🎯 Modern IME Fix: beforeinput', {
-                                    inputType,
-                                    data,
-                                    isComposing: (event as any).isComposing
-                                });
-                            }
+
 
                             // 对于需要特殊处理的inputType，使用RestoreDOM
                             const needsRestoreDOM = [
@@ -100,11 +94,16 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                                 'insertText'
                             ].includes(inputType);
 
-                            if (needsRestoreDOM && this.shouldUseRestoreDOM()) {
-                                if (this.options.debug) {
-                                    console.log('🎯 Modern IME Fix: Using RestoreDOM for', inputType);
-                                }
+                            // 检查是否需要使用RestoreDOM
+                            const shouldUseRestoreDOM = () => {
+                                if (typeof window === 'undefined') return false;
+                                const userAgent = window.navigator.userAgent;
+                                const isAndroid = /Android/i.test(userAgent);
+                                const isMobile = /Mobile|Tablet/i.test(userAgent);
+                                return this.options.forceRestoreDOM || isAndroid || isMobile;
+                            };
 
+                            if (needsRestoreDOM && shouldUseRestoreDOM()) {
                                 // 尝试阻止默认行为
                                 try {
                                     event.preventDefault();
@@ -113,7 +112,46 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                                 }
 
                                 // 使用RestoreDOM处理
-                                this.handleWithRestoreDOM(view, inputType, data, event);
+                                const editableElement = getEditableElement(view.dom);
+                                if (editableElement) {
+                                    // 记录事件
+                                    const tr = view.state.tr.setMeta(ModernIMEFixPluginKey, {
+                                        type: 'restore-dom',
+                                        inputType,
+                                        data
+                                    });
+                                    view.dispatch(tr);
+
+                                    restoreDOM(editableElement, () => {
+                                        // 执行相应的编辑器命令
+                                        const { state, dispatch } = view;
+
+                                        switch (inputType) {
+                                            case 'insertCompositionText':
+                                            case 'insertText':
+                                                if (data) {
+                                                    if (data.includes('\n')) {
+                                                        // 插入换行
+                                                        const tr = state.tr.split(state.selection.from);
+                                                        dispatch(tr);
+                                                    } else {
+                                                        // 插入文本
+                                                        const tr = state.tr.insertText(data, state.selection.from, state.selection.to);
+                                                        dispatch(tr);
+                                                    }
+                                                }
+                                                break;
+                                            case 'deleteContentBackward':
+                                                // 向后删除
+                                                const tr = state.tr.delete(state.selection.from - 1, state.selection.from);
+                                                dispatch(tr);
+                                                break;
+                                        }
+                                    }, {
+                                        debug: false,
+                                        timeout: 50
+                                    });
+                                }
                                 return true; // 阻止ProseMirror的默认处理
                             }
 
@@ -123,12 +161,7 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                         // 简化的键盘事件处理
                         keydown: (view, event) => {
                             // 现代方案主要依赖beforeinput，keydown只做最小必要的处理
-                            if (event.key === 'Process' || event.keyCode === 229) {
-                                // IME正在处理中，记录状态
-                                if (this.options.debug) {
-                                    console.log('🎯 Modern IME Fix: IME processing key event');
-                                }
-                            }
+                            // 对于IME处理，我们主要依赖beforeinput事件
 
                             return false; // 让其他处理器正常工作
                         }
@@ -171,72 +204,6 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                 }
             })
         ];
-    },
-
-    // 辅助方法
-    shouldUseRestoreDOM() {
-        if (typeof window === 'undefined') return false;
-
-        const userAgent = window.navigator.userAgent;
-        const isAndroid = /Android/i.test(userAgent);
-        const isMobile = /Mobile|Tablet/i.test(userAgent);
-
-        return this.options.forceRestoreDOM || isAndroid || isMobile;
-    },
-
-    handleWithRestoreDOM(view: any, inputType: string, data: string | null, event: InputEvent) {
-        const editableElement = getEditableElement(view.dom);
-        if (!editableElement) return;
-
-        // 记录事件
-        const tr = view.state.tr.setMeta(ModernIMEFixPluginKey, {
-            type: 'restore-dom',
-            inputType,
-            data
-        });
-        view.dispatch(tr);
-
-        restoreDOM(editableElement, () => {
-            // 执行相应的编辑器命令
-            this.executeEditorCommand(view, inputType, data, event);
-        }, {
-            debug: this.options.debug,
-            timeout: 50
-        });
-    },
-
-    executeEditorCommand(view: any, inputType: string, data: string | null, event: InputEvent) {
-        const { state, dispatch } = view;
-
-        if (this.options.debug) {
-            console.log('🎯 Modern IME Fix: Executing command', { inputType, data });
-        }
-
-        switch (inputType) {
-            case 'insertCompositionText':
-            case 'insertText':
-                if (data) {
-                    if (data.includes('\n')) {
-                        // 插入换行
-                        const tr = state.tr.split(state.selection.from);
-                        dispatch(tr);
-                    } else {
-                        // 插入文本
-                        const tr = state.tr.insertText(data, state.selection.from, state.selection.to);
-                        dispatch(tr);
-                    }
-                }
-                break;
-            case 'deleteContentBackward':
-                // 向后删除
-                const tr = state.tr.delete(state.selection.from - 1, state.selection.from);
-                dispatch(tr);
-                break;
-            default:
-                if (this.options.debug) {
-                    console.log('🎯 Modern IME Fix: Unhandled inputType', inputType);
-                }
-        }
     }
 });
 
