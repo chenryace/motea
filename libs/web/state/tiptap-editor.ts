@@ -20,6 +20,7 @@ import { has } from 'lodash';
 // import { ROOT_ID } from 'libs/shared/const';
 import { parseMarkdownTitle } from 'libs/shared/markdown/parse-markdown-title';
 import { wrapEditorChangeForIME } from 'libs/web/utils/simple-ime-fix';
+import { createSmartOnChange } from 'libs/web/utils/input-state-tracker';
 const ROOT_ID = 'root';
 
 const useTiptapEditor = (initNote?: NoteModel) => {
@@ -236,8 +237,11 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         [saveToIndexedDB, note?.isDailyNote, note?.id]
     );
 
-    // 使用现代IME安全包装器 - 极小延时，主要依赖事件驱动
-    const onEditorChange = wrapEditorChangeForIME(originalOnEditorChange, 30);
+    // 使用智能onChange包装器 - 基于输入状态智能处理
+    const onEditorChange = createSmartOnChange(originalOnEditorChange, {
+        delay: 200, // 快速输入结束后200ms执行
+        debug: process.env.NODE_ENV === 'development'
+    });
 
     // Function to handle title changes specifically
     const onTitleChange = useCallback(
