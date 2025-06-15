@@ -236,8 +236,8 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         [saveToIndexedDB, note?.isDailyNote, note?.id]
     );
 
-    // 使用 IME 安全的包装器
-    const onEditorChange = wrapEditorChangeForIME(originalOnEditorChange, 600);
+    // 使用现代IME安全包装器 - 极小延时，主要依赖事件驱动
+    const onEditorChange = wrapEditorChangeForIME(originalOnEditorChange, 30);
 
     // Function to handle title changes specifically
     const onTitleChange = useCallback(
