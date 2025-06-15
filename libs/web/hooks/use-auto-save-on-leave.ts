@@ -26,7 +26,6 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
     const { enabled = true } = options;
     const router = useRouter();
     const isAutoSavingRef = useRef(false);
-    const userChoiceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isLeavingRef = useRef(false);
 
     const shouldAutoSave = useCallback(() => {
@@ -52,93 +51,79 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
         if (!enabled) return;
 
         if (shouldAutoSave()) {
-            // 标记正在处理离开事件
+            // 标记用户正在做离开决定
             isLeavingRef.current = true;
-
-            // 清除之前的超时
-            if (userChoiceTimeoutRef.current) {
-                clearTimeout(userChoiceTimeoutRef.current);
-            }
 
             // 显示确认对话框
             event.preventDefault();
             event.returnValue = '您有未保存的更改。确定要离开吗？';
 
-            // 设置超时来检测用户选择
-            userChoiceTimeoutRef.current = setTimeout(() => {
-                // 如果500ms后页面还在，说明用户选择了"取消"
-                if (isLeavingRef.current) {
-                    isLeavingRef.current = false;
-                    performAutoSave();
-                }
-            }, 500); // 给用户足够时间做选择
-
             return '您有未保存的更改。确定要离开吗？';
         }
-    }, [enabled, shouldAutoSave, performAutoSave]);
+    }, [enabled, shouldAutoSave]);
 
-    const handleRouteChangeStart = useCallback((url: string) => {
+    const handleRouteChangeStart = useCallback(async (url: string) => {
         if (!enabled || isAutoSavingRef.current) return;
 
         if (shouldAutoSave()) {
             isAutoSavingRef.current = true;
 
-            router.events.emit('routeChangeError', 'Auto-saving before route change', url);
+            // 阻止路由跳转
+            router.events.emit('routeChangeError', new Error('Auto-saving before route change'), url);
 
-            performAutoSave()
-                .then((success) => {
-                    if (success) {
-                        isAutoSavingRef.current = false;
-                        router.push(url);
-                    } else {
-                        isAutoSavingRef.current = false;
-                        const confirmed = window.confirm(
-                            'Auto-save failed. Force leave?'
-                        );
-                        if (confirmed) {
-                            router.push(url);
-                        }
-                    }
-                })
-                .catch((error) => {
-                    isAutoSavingRef.current = false;
-                    const confirmed = window.confirm(
-                        'Auto-save error. Force leave?'
-                    );
+            try {
+                const success = await performAutoSave();
+                isAutoSavingRef.current = false;
+
+                if (success) {
+                    // 自动保存成功，继续跳转
+                    router.push(url);
+                } else {
+                    // 自动保存失败，询问用户
+                    const confirmed = window.confirm('自动保存失败。是否强制离开？');
                     if (confirmed) {
                         router.push(url);
                     }
-                });
-
-            throw 'Auto-saving, please wait...';
+                }
+            } catch (error) {
+                isAutoSavingRef.current = false;
+                // 自动保存出错，询问用户
+                const confirmed = window.confirm('自动保存出错。是否强制离开？');
+                if (confirmed) {
+                    router.push(url);
+                }
+            }
         }
     }, [enabled, shouldAutoSave, performAutoSave, router]);
 
     // 处理页面真正卸载的情况
     const handlePageHide = useCallback((event: PageTransitionEvent) => {
-        // 用户确实选择了离开，取消自动保存
+        // 用户确实选择了离开
         isLeavingRef.current = false;
-        if (userChoiceTimeoutRef.current) {
-            clearTimeout(userChoiceTimeoutRef.current);
-            userChoiceTimeoutRef.current = null;
+    }, []);
+
+    // 处理页面重新获得焦点（用户选择了"取消"）
+    const handleFocus = useCallback(() => {
+        if (isLeavingRef.current) {
+            // 页面重新获得焦点，说明用户选择了"取消"
+            isLeavingRef.current = false;
+            // 执行自动保存
+            performAutoSave();
+        }
+    }, [performAutoSave]);
+
+    // 处理页面焦点变化
+    const handleVisibilityChange = useCallback(() => {
+        if (document.visibilityState === 'hidden' && isLeavingRef.current) {
+            // 页面变为隐藏状态，用户选择了离开
+            isLeavingRef.current = false;
         }
     }, []);
 
-    // 处理页面焦点变化（更可靠的检测方式）
-    const handleVisibilityChange = useCallback(() => {
-        if (document.visibilityState === 'hidden' && isLeavingRef.current) {
-            // 页面变为隐藏状态，可能是用户选择了离开
-            setTimeout(() => {
-                if (document.visibilityState === 'hidden') {
-                    // 确实离开了
-                    isLeavingRef.current = false;
-                    if (userChoiceTimeoutRef.current) {
-                        clearTimeout(userChoiceTimeoutRef.current);
-                        userChoiceTimeoutRef.current = null;
-                    }
-                }
-            }, 100);
-        }
+    // 处理页面真正卸载（最终保险）
+    const handleUnload = useCallback(() => {
+        // 页面真正卸载，用户确实选择了离开
+        isLeavingRef.current = false;
     }, []);
 
     useEffect(() => {
@@ -146,19 +131,18 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
 
         window.addEventListener('beforeunload', handleBeforeUnload);
         window.addEventListener('pagehide', handlePageHide);
+        window.addEventListener('unload', handleUnload);
+        window.addEventListener('focus', handleFocus);
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
             window.removeEventListener('pagehide', handlePageHide);
+            window.removeEventListener('unload', handleUnload);
+            window.removeEventListener('focus', handleFocus);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
-
-            // 清理超时
-            if (userChoiceTimeoutRef.current) {
-                clearTimeout(userChoiceTimeoutRef.current);
-            }
         };
-    }, [enabled, handleBeforeUnload, handlePageHide, handleVisibilityChange]);
+    }, [enabled, handleBeforeUnload, handlePageHide, handleUnload, handleFocus, handleVisibilityChange]);
 
     useEffect(() => {
         if (!enabled) return;
