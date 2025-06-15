@@ -56,7 +56,20 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         async (data: Partial<NoteModel>) => {
             if (!note?.id) return;
 
-            const updatedNote = { ...note, ...data };
+            // 从 IndexedDB 获取最新数据作为基础，避免覆盖已保存的数据
+            const existingNote = await noteCache.getItem(note.id);
+            const baseNote = existingNote || note;
+
+            const updatedNote = { ...baseNote, ...data };
+
+            // 调试信息：记录保存的内容
+            console.log('💾 Saving to IndexedDB:', {
+                noteId: note.id,
+                contentLength: data.content?.length || 0,
+                title: data.title,
+                hasContent: !!data.content
+            });
+
             await noteCache.setItem(note.id, updatedNote);
         },
         [note]
@@ -172,6 +185,12 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         async (value: () => string): Promise<void> => {
             const content = value();
 
+            // 调试信息：记录编辑器变化
+            console.log('✏️ Editor content changed:', {
+                contentLength: content.length,
+                contentPreview: content.substring(0, 100) + (content.length > 100 ? '...' : '')
+            });
+
             let title: string;
             if (note?.isDailyNote) {
                 title = note.title;
@@ -207,19 +226,18 @@ const useTiptapEditor = (initNote?: NoteModel) => {
                 }
             }
 
-            await saveToIndexedDB({ content, title });
             // Save to IndexedDB immediately for local persistence
-            saveToIndexedDB({
+            await saveToIndexedDB({
                 content,
                 title,
                 updated_at: new Date().toISOString()
-            })?.catch((v) => console.error('Error whilst saving to IndexedDB: %O', v));
+            });
         },
         [saveToIndexedDB, note?.isDailyNote, note?.id]
     );
 
-    // 使用 IME 安全的包装器，新版本不依赖 debounce，基于 composition 状态精确控制
-    const onEditorChange = wrapEditorChangeForIME(originalOnEditorChange);
+    // 使用 IME 安全的包装器
+    const onEditorChange = wrapEditorChangeForIME(originalOnEditorChange, 600);
 
     // Function to handle title changes specifically
     const onTitleChange = useCallback(
