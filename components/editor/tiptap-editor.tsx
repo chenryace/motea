@@ -34,7 +34,7 @@ import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
 import IMEFix from './extensions/ime-fix';
-import EnhancedIndentExtension from './extensions/enhanced-indent';
+import ProseMirrorIndentExtension from './extensions/prosemirror-indent';
 
 import FloatingToolbar from './floating-toolbar';
 
@@ -116,8 +116,8 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 debug: false,
                 forceRestoreDOM: false,
             }),
-            // 增强缩进扩展（非入侵性）
-            EnhancedIndentExtension,
+            // ProseMirror原生缩进扩展
+            ProseMirrorIndentExtension,
 
         ],
         content: value,
