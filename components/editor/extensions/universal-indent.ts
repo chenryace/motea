@@ -106,7 +106,7 @@ function updateIndentLevel(tr: Transaction, delta: number): Transaction {
 
 export const UniversalIndentExtension = Extension.create<IndentOptions>({
     name: 'universalIndent',
-    priority: 1000,
+    priority: 50, // 降低优先级，让列表扩展优先处理
 
     addOptions() {
         return {
@@ -138,17 +138,23 @@ export const UniversalIndentExtension = Extension.create<IndentOptions>({
     addCommands() {
         return {
             indent: (): Command => ({ tr, state, dispatch }) => {
-                // 首先尝试列表项缩进
-                if (this.editor.commands.sinkListItem('listItem')) {
-                    return true;
-                }
-
-                if (this.editor.commands.sinkListItem('taskItem')) {
-                    return true;
-                }
-
-                // 处理普通文本缩进
                 const { selection } = state;
+                const { $from } = selection;
+
+                // 检查是否在列表项中 - 如果是，返回false让列表扩展处理
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList || isInTaskList) {
+                    return false; // 让列表扩展处理
+                }
+
+                // 只处理普通文本缩进
                 tr = tr.setSelection(selection);
                 tr = updateIndentLevel(tr, IndentProps.more);
 
@@ -161,17 +167,23 @@ export const UniversalIndentExtension = Extension.create<IndentOptions>({
             },
             
             outdent: (): Command => ({ tr, state, dispatch }) => {
-                // 首先尝试列表项取消缩进
-                if (this.editor.commands.liftListItem('listItem')) {
-                    return true;
-                }
-
-                if (this.editor.commands.liftListItem('taskItem')) {
-                    return true;
-                }
-
-                // 处理普通文本取消缩进
                 const { selection } = state;
+                const { $from } = selection;
+
+                // 检查是否在列表项中 - 如果是，返回false让列表扩展处理
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList || isInTaskList) {
+                    return false; // 让列表扩展处理
+                }
+
+                // 只处理普通文本取消缩进
                 tr = tr.setSelection(selection);
                 tr = updateIndentLevel(tr, IndentProps.less);
 
@@ -187,8 +199,44 @@ export const UniversalIndentExtension = Extension.create<IndentOptions>({
 
     addKeyboardShortcuts() {
         return {
-            'Tab': () => this.editor.commands.indent(),
-            'Shift-Tab': () => this.editor.commands.outdent(),
+            'Tab': () => {
+                // 只在非列表环境中处理Tab键
+                const { state } = this.editor;
+                const { $from } = state.selection;
+
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList || isInTaskList) {
+                    return false; // 让列表扩展处理
+                }
+
+                return this.editor.commands.indent();
+            },
+            'Shift-Tab': () => {
+                // 只在非列表环境中处理Shift+Tab键
+                const { state } = this.editor;
+                const { $from } = state.selection;
+
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList || isInTaskList) {
+                    return false; // 让列表扩展处理
+                }
+
+                return this.editor.commands.outdent();
+            },
         };
     },
 
