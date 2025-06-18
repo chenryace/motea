@@ -15,8 +15,98 @@
  * copies or substantial portions of the Software.
  */
 
-import { Extension, Node } from '@tiptap/core';
+import { Extension, Node, Command } from '@tiptap/core';
 import { textblockTypeInputRule, mergeAttributes, InputRule } from '@tiptap/core';
+import { TextSelection, AllSelection, Transaction } from 'prosemirror-state';
+import { Node as ProseMirrorNode } from 'prosemirror-model';
+
+// 缩进相关的类型和工具函数
+declare module '@tiptap/core' {
+    interface Commands<ReturnType = any> {
+        indent: {
+            /**
+             * 增加缩进
+             */
+            indent: () => ReturnType;
+            /**
+             * 减少缩进
+             */
+            outdent: () => ReturnType;
+        };
+    }
+}
+
+export function clamp(val: number, min: number, max: number): number {
+    if (val < min) {
+        return min;
+    }
+    if (val > max) {
+        return max;
+    }
+    return val;
+}
+
+export enum IndentProps {
+    min = 0,
+    max = 240,
+    more = 30,
+    less = -30
+}
+
+export function isListNode(node: ProseMirrorNode): boolean {
+    return ['bulletList', 'orderedList', 'taskList', 'listItem', 'taskItem'].includes(node.type.name);
+}
+
+function setNodeIndentMarkup(tr: Transaction, pos: number, delta: number): Transaction {
+    if (!tr.doc) return tr;
+
+    const node = tr.doc.nodeAt(pos);
+    if (!node) return tr;
+
+    const minIndent = IndentProps.min;
+    const maxIndent = IndentProps.max;
+
+    const indent = clamp(
+        (node.attrs.indent || 0) + delta,
+        minIndent,
+        maxIndent,
+    );
+
+    if (indent === node.attrs.indent) return tr;
+
+    const nodeAttrs = {
+        ...node.attrs,
+        indent,
+    };
+
+    return tr.setNodeMarkup(pos, node.type, nodeAttrs, node.marks);
+}
+
+function updateIndentLevel(tr: Transaction, delta: number): Transaction {
+    const { doc, selection } = tr;
+
+    if (!doc || !selection) return tr;
+
+    if (!(selection instanceof TextSelection || selection instanceof AllSelection)) {
+        return tr;
+    }
+
+    const { from, to } = selection;
+
+    doc.nodesBetween(from, to, (node, pos) => {
+        const nodeType = node.type;
+
+        if (nodeType.name === 'paragraph' || nodeType.name === 'heading') {
+            tr = setNodeIndentMarkup(tr, pos, delta);
+            return false;
+        } else if (isListNode(node)) {
+            return false;
+        }
+        return true;
+    });
+
+    return tr;
+}
 
 // IME安全的InputRule包装器
 function createIMESafeInputRule(options: any): InputRule {
@@ -388,12 +478,31 @@ export const CustomHeading = Node.create({
 
 export const MarkdownExtension = Extension.create({
     name: 'markdown',
-    priority: 1000, 
+    priority: 1000,
 
     addStorage() {
         return {
             transformer: new MarkdownTransformer(),
         };
+    },
+
+    addGlobalAttributes() {
+        return [
+            {
+                types: ['heading', 'paragraph'],
+                attributes: {
+                    indent: {
+                        default: 0,
+                        renderHTML: attributes => ({
+                            style: `margin-left: ${attributes.indent}px!important;`
+                        }),
+                        parseHTML: element => ({
+                            indent: parseInt(element.style.marginLeft) || 0,
+                        }),
+                    },
+                },
+            },
+        ];
     },
 
     addCommands() {
@@ -404,6 +513,62 @@ export const MarkdownExtension = Extension.create({
             },
             getMarkdown: () => ({ editor }: any) => {
                 return this.storage.transformer.serialize(editor.state.doc);
+            },
+            indent: (): Command => ({ tr, state, dispatch }) => {
+                // 首先检查是否在列表中，如果是，让列表扩展处理
+                const { selection } = state;
+                const { $from } = selection;
+
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList || isInTaskList) {
+                    return false; // 让列表扩展处理
+                }
+
+                // 处理普通文本缩进
+                tr = tr.setSelection(selection);
+                tr = updateIndentLevel(tr, IndentProps.more);
+
+                if (tr.docChanged) {
+                    dispatch && dispatch(tr);
+                    return true;
+                }
+
+                return false;
+            },
+            outdent: (): Command => ({ tr, state, dispatch }) => {
+                // 首先检查是否在列表中，如果是，让列表扩展处理
+                const { selection } = state;
+                const { $from } = selection;
+
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList || isInTaskList) {
+                    return false; // 让列表扩展处理
+                }
+
+                // 处理普通文本取消缩进
+                tr = tr.setSelection(selection);
+                tr = updateIndentLevel(tr, IndentProps.less);
+
+                if (tr.docChanged) {
+                    dispatch && dispatch(tr);
+                    return true;
+                }
+
+                return false;
             },
         } as any;
     },
@@ -539,6 +704,45 @@ export const MarkdownExtension = Extension.create({
                     saveButton.click();
                 }
                 return true;
+            },
+
+            'Tab': () => {
+                // 只在非列表环境中处理Tab键
+                const { state } = this.editor;
+                const { $from } = state.selection;
+
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList || isInTaskList) {
+                    return false; // 让列表扩展处理
+                }
+
+                return this.editor.commands.indent();
+            },
+            'Shift-Tab': () => {
+                // 只在非列表环境中处理Shift+Tab键
+                const { state } = this.editor;
+                const { $from } = state.selection;
+
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList || isInTaskList) {
+                    return false; // 让列表扩展处理
+                }
+
+                return this.editor.commands.outdent();
             },
 
             'Enter': () => {

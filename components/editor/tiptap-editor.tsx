@@ -34,7 +34,7 @@ import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
 import IMEFix from './extensions/ime-fix';
-import UniversalIndentExtension from './extensions/universal-indent';
+
 import FloatingToolbar from './floating-toolbar';
 
 export interface TiptapEditorProps {
@@ -115,8 +115,7 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 debug: false,
                 forceRestoreDOM: false,
             }),
-            // 通用缩进扩展
-            UniversalIndentExtension,
+
         ],
         content: value,
         editable: !readOnly,
