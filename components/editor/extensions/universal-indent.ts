@@ -1,25 +1,144 @@
 /**
  * Universal Indent Extension for TipTap Editor
- * 为整个编辑器提供通用的缩进功能
- * 
+ * 基于TipTap社区成熟方案的通用缩进功能
+ *
+ * 参考: https://github.com/ueberdosis/tiptap/issues/1036
  * Copyright (c) 2025 waycaan
  * Licensed under the MIT License
  */
 
-import { Extension } from '@tiptap/core';
+import { Extension, Command } from '@tiptap/core';
+import { Node } from 'prosemirror-model';
+import { TextSelection, AllSelection, Transaction } from 'prosemirror-state';
 
-export const UniversalIndentExtension = Extension.create({
+type IndentOptions = {
+    types: string[];
+    indentLevels: number[];
+    defaultIndentLevel: number;
+};
+
+declare module '@tiptap/core' {
+    interface Commands<ReturnType = any> {
+        indent: {
+            /**
+             * 增加缩进
+             */
+            indent: () => ReturnType;
+            /**
+             * 减少缩进
+             */
+            outdent: () => ReturnType;
+        };
+    }
+}
+
+export function clamp(val: number, min: number, max: number): number {
+    if (val < min) {
+        return min;
+    }
+    if (val > max) {
+        return max;
+    }
+    return val;
+}
+
+export enum IndentProps {
+    min = 0,
+    max = 240,
+    more = 30,
+    less = -30
+}
+
+export function isListNode(node: Node): boolean {
+    return ['bulletList', 'orderedList', 'taskList', 'listItem', 'taskItem'].includes(node.type.name);
+}
+
+function setNodeIndentMarkup(tr: Transaction, pos: number, delta: number): Transaction {
+    if (!tr.doc) return tr;
+
+    const node = tr.doc.nodeAt(pos);
+    if (!node) return tr;
+
+    const minIndent = IndentProps.min;
+    const maxIndent = IndentProps.max;
+
+    const indent = clamp(
+        (node.attrs.indent || 0) + delta,
+        minIndent,
+        maxIndent,
+    );
+
+    if (indent === node.attrs.indent) return tr;
+
+    const nodeAttrs = {
+        ...node.attrs,
+        indent,
+    };
+
+    return tr.setNodeMarkup(pos, node.type, nodeAttrs, node.marks);
+}
+
+function updateIndentLevel(tr: Transaction, delta: number): Transaction {
+    const { doc, selection } = tr;
+
+    if (!doc || !selection) return tr;
+
+    if (!(selection instanceof TextSelection || selection instanceof AllSelection)) {
+        return tr;
+    }
+
+    const { from, to } = selection;
+
+    doc.nodesBetween(from, to, (node, pos) => {
+        const nodeType = node.type;
+
+        if (nodeType.name === 'paragraph' || nodeType.name === 'heading') {
+            tr = setNodeIndentMarkup(tr, pos, delta);
+            return false;
+        } else if (isListNode(node)) {
+            return false;
+        }
+        return true;
+    });
+
+    return tr;
+}
+
+export const UniversalIndentExtension = Extension.create<IndentOptions>({
     name: 'universalIndent',
     priority: 1000,
 
+    addOptions() {
+        return {
+            types: ['heading', 'paragraph'],
+            indentLevels: [0, 30, 60, 90, 120, 150, 180, 210, 240],
+            defaultIndentLevel: 0,
+        };
+    },
+
+    addGlobalAttributes() {
+        return [
+            {
+                types: this.options.types,
+                attributes: {
+                    indent: {
+                        default: this.options.defaultIndentLevel,
+                        renderHTML: attributes => ({
+                            style: `margin-left: ${attributes.indent}px!important;`
+                        }),
+                        parseHTML: element => ({
+                            indent: parseInt(element.style.marginLeft) || this.options.defaultIndentLevel,
+                        }),
+                    },
+                },
+            },
+        ];
+    },
+
     addCommands() {
         return {
-            // 通用缩进命令
-            indent: () => ({ state, dispatch }: any) => {
-                const { selection } = state;
-                const { from, to, $from } = selection;
-
-                // 首先尝试列表项缩进（TipTap会自动处理多选情况）
+            indent: (): Command => ({ tr, state, dispatch }) => {
+                // 首先尝试列表项缩进
                 if (this.editor.commands.sinkListItem('listItem')) {
                     return true;
                 }
@@ -28,16 +147,21 @@ export const UniversalIndentExtension = Extension.create({
                     return true;
                 }
 
-                // 如果不是列表项，处理普通文本缩进
-                return this.handleTextIndent(state, dispatch, from, to);
+                // 处理普通文本缩进
+                const { selection } = state;
+                tr = tr.setSelection(selection);
+                tr = updateIndentLevel(tr, IndentProps.more);
+
+                if (tr.docChanged) {
+                    dispatch && dispatch(tr);
+                    return true;
+                }
+
+                return false;
             },
             
-            // 通用取消缩进命令
-            outdent: () => ({ state, dispatch }: any) => {
-                const { selection } = state;
-                const { from, to } = selection;
-
-                // 首先尝试列表项取消缩进（TipTap会自动处理多选情况）
+            outdent: (): Command => ({ tr, state, dispatch }) => {
+                // 首先尝试列表项取消缩进
                 if (this.editor.commands.liftListItem('listItem')) {
                     return true;
                 }
@@ -46,93 +170,13 @@ export const UniversalIndentExtension = Extension.create({
                     return true;
                 }
 
-                // 如果不是列表项，处理普通文本取消缩进
-                return this.handleTextOutdent(state, dispatch, from, to);
-            },
-            // 处理普通文本缩进
-            handleTextIndent: (state: any, dispatch: any, from: number, to: number) => {
-                if (from === to) {
-                    // 光标位置，插入缩进
-                    const tr = state.tr.insertText('    ', from);
-                    if (dispatch) dispatch(tr);
-                    return true;
-                } else {
-                    // 选中文本，逐行处理缩进
-                    const tr = state.tr;
-                    let offset = 0;
+                // 处理普通文本取消缩进
+                const { selection } = state;
+                tr = tr.setSelection(selection);
+                tr = updateIndentLevel(tr, IndentProps.less);
 
-                    // 找到选中范围内的所有行开始位置
-                    const doc = state.doc;
-                    const startLine = doc.resolve(from);
-                    const endLine = doc.resolve(to);
-
-                    // 从后往前处理，避免位置偏移问题
-                    for (let pos = to; pos >= from; pos--) {
-                        const resolved = doc.resolve(pos);
-                        const char = doc.textBetween(pos, pos + 1);
-
-                        // 如果是换行符的下一个位置，或者是选择的开始位置
-                        if (char === '\n' || pos === from) {
-                            const insertPos = char === '\n' ? pos + 1 : pos;
-                            if (insertPos <= to + offset) {
-                                tr.insertText('    ', insertPos);
-                                offset += 4;
-                            }
-                        }
-                    }
-
-                    if (dispatch) dispatch(tr);
-                    return true;
-                }
-            },
-
-            // 处理普通文本取消缩进
-            handleTextOutdent: (state: any, dispatch: any, from: number, to: number) => {
-                if (from === to) {
-                    // 光标位置，检查并移除前面的缩进
-                    const { $from } = state.selection;
-                    const lineStart = $from.start();
-                    const textFromLineStart = state.doc.textBetween(lineStart, from);
-
-                    if (textFromLineStart.endsWith('    ')) {
-                        const tr = state.tr.delete(from - 4, from);
-                        if (dispatch) dispatch(tr);
-                        return true;
-                    } else if (textFromLineStart.endsWith('\t')) {
-                        const tr = state.tr.delete(from - 1, from);
-                        if (dispatch) dispatch(tr);
-                        return true;
-                    }
-                } else {
-                    // 选中文本，逐行处理取消缩进
-                    const tr = state.tr;
-                    let offset = 0;
-                    const doc = state.doc;
-
-                    // 从后往前处理，避免位置偏移问题
-                    for (let pos = to; pos >= from; pos--) {
-                        const char = doc.textBetween(pos, pos + 1);
-
-                        // 如果是换行符的下一个位置，或者是选择的开始位置
-                        if (char === '\n' || pos === from) {
-                            const checkPos = char === '\n' ? pos + 1 : pos;
-                            if (checkPos <= to + offset) {
-                                // 检查这个位置开始是否有缩进
-                                const nextFour = doc.textBetween(checkPos, checkPos + 4);
-                                const nextOne = doc.textBetween(checkPos, checkPos + 1);
-
-                                if (nextFour === '    ') {
-                                    tr.delete(checkPos, checkPos + 4);
-                                    offset -= 4;
-                                } else if (nextOne === '\t') {
-                                    tr.delete(checkPos, checkPos + 1);
-                                    offset -= 1;
-                                }
-                            }
-                        }
-                    }
-
-                    if (dispatch) dispatch(tr);
+                if (tr.docChanged) {
+                    dispatch && dispatch(tr);
                     return true;
                 }
 
@@ -152,10 +196,9 @@ export const UniversalIndentExtension = Extension.create({
         return [
             // 换行保持缩进插件
             new (require('prosemirror-state').Plugin)({
-                key: new (require('prosemirror-state').PluginKey)('universalIndentHandler'),
+                key: new (require('prosemirror-state').PluginKey)('indentNewlineHandler'),
                 props: {
                     handleKeyDown: (view: any, event: KeyboardEvent) => {
-                        // 只处理Enter键
                         if (event.key !== 'Enter') {
                             return false;
                         }
@@ -165,43 +208,31 @@ export const UniversalIndentExtension = Extension.create({
                         const { $from } = selection;
 
                         // 检查是否在列表项中，如果是，让列表处理
-                        const isInList = $from.node(-1)?.type.name === 'listItem' ||
-                                        $from.node(-2)?.type.name === 'listItem' ||
-                                        $from.node(-3)?.type.name === 'listItem';
-                        
-                        const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
-                                            $from.node(-2)?.type.name === 'taskItem' ||
-                                            $from.node(-3)?.type.name === 'taskItem';
-
-                        if (isInList || isInTaskList) {
-                            return false; // 让列表扩展处理
+                        if (isListNode($from.parent)) {
+                            return false;
                         }
 
-                        // 检测当前行的缩进
-                        const lineStart = $from.start();
-                        const lineEnd = $from.end();
-                        const currentLine = state.doc.textBetween(lineStart, lineEnd);
-                        
-                        // 检测行开头的缩进
-                        const indentMatch = currentLine.match(/^(\s+)/);
-                        if (indentMatch) {
-                            const indent = indentMatch[1];
-                            
+                        // 检查当前节点是否有缩进属性
+                        const currentNode = $from.parent;
+                        const indent = currentNode.attrs.indent;
+
+                        if (indent && indent > 0) {
                             // 如果当前行只有缩进（空行），不保持缩进
-                            if (currentLine.trim() === '') {
-                                return false; // 让默认行为处理
+                            if (currentNode.textContent.trim() === '') {
+                                return false;
                             }
-                            
-                            // 创建新行并保持缩进
+
+                            // 创建新段落并保持缩进
                             const tr = state.tr;
-                            tr.insertText('\n' + indent, $from.pos);
+                            const newParagraph = state.schema.nodes.paragraph.create({ indent });
+                            tr.replaceSelectionWith(newParagraph);
                             view.dispatch(tr);
-                            
+
                             event.preventDefault();
                             return true;
                         }
 
-                        return false; // 让默认行为处理
+                        return false;
                     },
                 }
             })
