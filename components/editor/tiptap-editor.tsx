@@ -24,7 +24,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import ListItem from '@tiptap/extension-list-item';
 import Highlight from './extensions/highlight';
 import { use100vh } from 'react-div-100vh';
 import useMounted from 'libs/web/hooks/use-mounted';
@@ -35,7 +34,7 @@ import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
 import IMEFix from './extensions/ime-fix';
-import ProseMirrorIndentExtension from './extensions/prosemirror-indent';
+import EnhancedIndentExtension from './extensions/enhanced-indent';
 
 import FloatingToolbar from './floating-toolbar';
 
@@ -73,7 +72,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
         extensions: [
             StarterKit.configure({
                 heading: false, // 禁用默认heading，使用我们自定义的
-                listItem: false, // 禁用默认listItem，避免与我们的缩进扩展冲突
                 codeBlock: {
                     languageClassPrefix: 'language-',
                 },
@@ -101,7 +99,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
             Highlight.configure({
                 multicolor: false,
             }),
-            ListItem,
             TaskList,
             TaskItem.configure({
                 nested: true,
@@ -119,8 +116,8 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 debug: false,
                 forceRestoreDOM: false,
             }),
-            // ProseMirror原生缩进扩展
-            ProseMirrorIndentExtension,
+            // 增强缩进扩展（非入侵性）
+            EnhancedIndentExtension,
 
         ],
         content: value,

@@ -12,7 +12,7 @@
 import React, { useEffect, useState } from 'react';
 import { Editor } from '@tiptap/react';
 import { useTheme } from 'next-themes';
-import { SubdirectoryArrowRight } from '@material-ui/lab';
+import { SubdirectoryArrowRight } from '@material-ui/icons';
 
 interface FloatingToolbarProps {
     editor: Editor | null;
@@ -174,7 +174,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
                     }
                 } else {
                     // 普通文本缩进
-                    editor.commands.indent();
+                    editor.commands.indentText();
                 }
             },
             isActive: (() => {
