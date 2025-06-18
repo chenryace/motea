@@ -148,27 +148,14 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
         },
         {
             icon: '→',
-            action: () => {
-                // 尝试缩进列表项或任务项
-                const success = editor.commands.sinkListItem('listItem') ||
-                               editor.commands.sinkListItem('taskItem');
-                if (!success) {
-                    // 如果不在列表中，可以考虑插入制表符或空格
-                    editor.commands.insertContent('    '); // 插入4个空格作为缩进
-                }
-            },
+            action: () => editor.commands.indent(),
             isActive: false,
             title: 'Indent (Tab)',
             className: 'font-bold'
         },
         {
             icon: '←',
-            action: () => {
-                // 尝试取消缩进列表项或任务项
-                const success = editor.commands.liftListItem('listItem') ||
-                               editor.commands.liftListItem('taskItem');
-                // 如果不在列表中，不执行任何操作
-            },
+            action: () => editor.commands.outdent(),
             isActive: false,
             title: 'Outdent (Shift+Tab)',
             className: 'font-bold'

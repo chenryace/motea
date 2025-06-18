@@ -489,72 +489,7 @@ export const MarkdownExtension = Extension.create({
                 }
                 return true;
             },
-            'Tab': () => {
-                const { state } = this.editor;
-                const { $from } = state.selection;
 
-                // 检查是否在列表项中
-                const isInList = $from.node(-1)?.type.name === 'listItem' ||
-                                $from.node(-2)?.type.name === 'listItem' ||
-                                $from.node(-3)?.type.name === 'listItem';
-
-                if (isInList) {
-                    // 在列表项中，执行缩进
-                    const result = this.editor.commands.sinkListItem('listItem');
-                    if (result) {
-                        return true; // 阻止默认Tab行为
-                    }
-                }
-
-                // 检查是否在任务列表中
-                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
-                                    $from.node(-2)?.type.name === 'taskItem' ||
-                                    $from.node(-3)?.type.name === 'taskItem';
-
-                if (isInTaskList) {
-                    // 在任务列表中，执行缩进
-                    const result = this.editor.commands.sinkListItem('taskItem');
-                    if (result) {
-                        return true; // 阻止默认Tab行为
-                    }
-                }
-
-                // 如果不在列表中或缩进失败，阻止默认Tab行为以防止焦点离开编辑器
-                return true;
-            },
-            'Shift-Tab': () => {
-                const { state } = this.editor;
-                const { $from } = state.selection;
-
-                // 检查是否在列表项中
-                const isInList = $from.node(-1)?.type.name === 'listItem' ||
-                                $from.node(-2)?.type.name === 'listItem' ||
-                                $from.node(-3)?.type.name === 'listItem';
-
-                if (isInList) {
-                    // 在列表项中，执行取消缩进
-                    const result = this.editor.commands.liftListItem('listItem');
-                    if (result) {
-                        return true; // 阻止默认Shift+Tab行为
-                    }
-                }
-
-                // 检查是否在任务列表中
-                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
-                                    $from.node(-2)?.type.name === 'taskItem' ||
-                                    $from.node(-3)?.type.name === 'taskItem';
-
-                if (isInTaskList) {
-                    // 在任务列表中，执行取消缩进
-                    const result = this.editor.commands.liftListItem('taskItem');
-                    if (result) {
-                        return true; // 阻止默认Shift+Tab行为
-                    }
-                }
-
-                // 如果不在列表中或取消缩进失败，阻止默认Shift+Tab行为以防止焦点离开编辑器
-                return true;
-            },
             'Enter': () => {
                 const { state } = this.editor;
                 const { $from } = state.selection;

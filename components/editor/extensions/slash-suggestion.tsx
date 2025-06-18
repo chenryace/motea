@@ -85,25 +85,19 @@ const commands = [
         },
     },
     {
-        title: 'Indent List Item',
+        title: 'Indent',
         command: ({ editor, range }: any) => {
             editor.chain().focus().deleteRange(range).run();
-            // 尝试缩进列表项或任务项
-            const success = editor.commands.sinkListItem('listItem') ||
-                           editor.commands.sinkListItem('taskItem');
-            if (!success) {
-                // 如果不在列表中，插入缩进空格
-                editor.commands.insertContent('    ');
-            }
+            // 使用通用缩进命令
+            editor.commands.indent();
         },
     },
     {
-        title: 'Outdent List Item',
+        title: 'Outdent',
         command: ({ editor, range }: any) => {
             editor.chain().focus().deleteRange(range).run();
-            // 尝试取消缩进列表项或任务项
-            editor.commands.liftListItem('listItem') ||
-            editor.commands.liftListItem('taskItem');
+            // 使用通用取消缩进命令
+            editor.commands.outdent();
         },
     },
 ];
