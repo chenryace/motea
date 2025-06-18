@@ -18,6 +18,164 @@
 import { Extension, Node } from '@tiptap/core';
 import { textblockTypeInputRule, mergeAttributes } from '@tiptap/core';
 
+// 检查是否是markdown内容
+function isMarkdownContent(text: string): boolean {
+    if (!text) return false;
+
+    // 检查常见的markdown模式
+    const markdownPatterns = [
+        /^#{1,6}\s+/m,           // 标题
+        /^\s*[-*+]\s+/m,         // 无序列表
+        /^\s*\d+\.\s+/m,         // 有序列表
+        /^\s*>\s+/m,             // 引用
+        /```[\s\S]*```/,         // 代码块
+        /`[^`]+`/,               // 行内代码
+        /\*\*[^*]+\*\*/,         // 粗体
+        /\*[^*]+\*/,             // 斜体
+        /\[[^\]]+\]\([^)]+\)/,   // 链接
+    ];
+
+    return markdownPatterns.some(pattern => pattern.test(text));
+}
+
+// 预处理markdown内容
+function preprocessMarkdown(markdown: string): string {
+    let processed = markdown;
+
+    // 改进列表项的缩进处理
+    const lines = processed.split('\n');
+    const processedLines = lines.map(line => {
+        // 处理缩进的列表项
+        const indentMatch = line.match(/^(\s*)([*+-]|\d+\.)\s+(.*)$/);
+        if (indentMatch) {
+            const [, indent, marker, content] = indentMatch;
+            // 确保缩进是4的倍数，这样TipTap能更好地处理嵌套
+            const indentLevel = Math.floor(indent.length / 2);
+            const normalizedIndent = '  '.repeat(indentLevel);
+            return `${normalizedIndent}${marker} ${content}`;
+        }
+        return line;
+    });
+
+    return processedLines.join('\n');
+}
+
+// 处理列表转换
+function processLists(text: string): string {
+    const lines = text.split('\n');
+    let result = '';
+    let inList = false;
+    let listType = '';
+    let currentIndent = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const listMatch = line.match(/^(\s*)([*+-]|\d+\.)\s+(.*)$/);
+
+        if (listMatch) {
+            const [, indent, marker, content] = listMatch;
+            const indentLevel = Math.floor(indent.length / 2);
+            const isOrdered = /\d+\./.test(marker);
+            const newListType = isOrdered ? 'ol' : 'ul';
+
+            if (!inList) {
+                result += `<${newListType}>`;
+                inList = true;
+                listType = newListType;
+                currentIndent = indentLevel;
+            } else if (indentLevel > currentIndent) {
+                result += `<${newListType}>`;
+                currentIndent = indentLevel;
+            } else if (indentLevel < currentIndent) {
+                result += `</${listType}>`;
+                currentIndent = indentLevel;
+            }
+
+            result += `<li>${content}</li>`;
+        } else {
+            if (inList) {
+                result += `</${listType}>`;
+                inList = false;
+            }
+            result += line + '\n';
+        }
+    }
+
+    if (inList) {
+        result += `</${listType}>`;
+    }
+
+    return result;
+}
+
+// 简单的markdown到HTML转换
+function markdownToHtml(markdown: string): string {
+    let html = markdown;
+
+    // 标题
+    html = html.replace(/^(#{1,6})\s+(.*)$/gm, (match, hashes, content) => {
+        const level = hashes.length;
+        return `<h${level}>${content}</h${level}>`;
+    });
+
+    // 粗体
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // 斜体
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+    // 行内代码
+    html = html.replace(/`(.*?)`/g, '<code>$1</code>');
+
+    // 链接
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+    // 处理列表
+    html = processLists(html);
+
+    // 处理段落
+    html = html.replace(/\n\n/g, '</p><p>');
+    html = `<p>${html}</p>`;
+    html = html.replace(/<p><\/p>/g, '');
+
+    return html;
+}
+
+// 处理markdown粘贴
+function handleMarkdownPaste(view: any, markdown: string): void {
+    try {
+        // 预处理markdown内容，改进列表缩进处理
+        const processedMarkdown = preprocessMarkdown(markdown);
+
+        // 使用TipTap的内置markdown解析
+        const { state } = view;
+        const { tr } = state;
+        const { from } = state.selection;
+
+        // 将markdown转换为HTML，然后让TipTap解析
+        const html = markdownToHtml(processedMarkdown);
+
+        // 创建一个临时的DOM元素来解析HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+
+        // 使用TipTap的DOMParser来解析内容
+        const parser = require('prosemirror-model').DOMParser.fromSchema(state.schema);
+        const doc = parser.parse(tempDiv);
+
+        // 插入解析后的内容
+        const newTr = tr.replaceWith(from, from, doc.content);
+        view.dispatch(newTr);
+    } catch (error) {
+        console.error('Error handling markdown paste:', error);
+        // 如果处理失败，回退到普通文本插入
+        const { state } = view;
+        const { tr } = state;
+        const { from } = state.selection;
+        view.dispatch(tr.insertText(markdown, from));
+    }
+}
+
 class MarkdownTransformer {
     serialize(doc: any): string {
         return this.htmlToMarkdown(doc.content);
@@ -294,9 +452,33 @@ export const MarkdownExtension = Extension.create({
                         return false;
                     },
                 }
+            }),
+            // 增强的粘贴处理插件
+            new (require('prosemirror-state').Plugin)({
+                key: new (require('prosemirror-state').PluginKey)('enhancedPasteHandler'),
+                props: {
+                    handlePaste: (view: any, event: ClipboardEvent, slice: any) => {
+                        const clipboardData = event.clipboardData;
+                        if (!clipboardData) return false;
+
+                        const text = clipboardData.getData('text/plain');
+                        const html = clipboardData.getData('text/html');
+
+                        // 检查是否是markdown内容
+                        if (isMarkdownContent(text)) {
+                            event.preventDefault();
+                            handleMarkdownPaste(view, text);
+                            return true;
+                        }
+
+                        return false;
+                    },
+                }
             })
         ];
     },
+
+
 
     addKeyboardShortcuts() {
         return {
@@ -307,16 +489,86 @@ export const MarkdownExtension = Extension.create({
                 }
                 return true;
             },
-            'Tab': () => this.editor.commands.sinkListItem('listItem'),
-            'Shift-Tab': () => this.editor.commands.liftListItem('listItem'),
+            'Tab': () => {
+                const { state } = this.editor;
+                const { $from } = state.selection;
+
+                // 检查是否在列表项中
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                if (isInList) {
+                    // 在列表项中，执行缩进
+                    const result = this.editor.commands.sinkListItem('listItem');
+                    if (result) {
+                        return true; // 阻止默认Tab行为
+                    }
+                }
+
+                // 检查是否在任务列表中
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInTaskList) {
+                    // 在任务列表中，执行缩进
+                    const result = this.editor.commands.sinkListItem('taskItem');
+                    if (result) {
+                        return true; // 阻止默认Tab行为
+                    }
+                }
+
+                // 如果不在列表中或缩进失败，阻止默认Tab行为以防止焦点离开编辑器
+                return true;
+            },
+            'Shift-Tab': () => {
+                const { state } = this.editor;
+                const { $from } = state.selection;
+
+                // 检查是否在列表项中
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                if (isInList) {
+                    // 在列表项中，执行取消缩进
+                    const result = this.editor.commands.liftListItem('listItem');
+                    if (result) {
+                        return true; // 阻止默认Shift+Tab行为
+                    }
+                }
+
+                // 检查是否在任务列表中
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInTaskList) {
+                    // 在任务列表中，执行取消缩进
+                    const result = this.editor.commands.liftListItem('taskItem');
+                    if (result) {
+                        return true; // 阻止默认Shift+Tab行为
+                    }
+                }
+
+                // 如果不在列表中或取消缩进失败，阻止默认Shift+Tab行为以防止焦点离开编辑器
+                return true;
+            },
             'Enter': () => {
                 const { state } = this.editor;
                 const { $from } = state.selection;
-                
+
                 // 如果在空的列表项中按回车，跳出列表
                 if ($from.parent.type.name === 'listItem' && $from.parent.textContent === '') {
                     return this.editor.commands.liftListItem('listItem');
                 }
+
+                // 如果在空的任务项中按回车，跳出任务列表
+                if ($from.parent.type.name === 'taskItem' && $from.parent.textContent === '') {
+                    return this.editor.commands.liftListItem('taskItem');
+                }
+
                 return false; // 让 Tiptap 处理其他情况
             }
         };
