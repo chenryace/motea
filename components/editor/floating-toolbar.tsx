@@ -12,7 +12,7 @@
 import React, { useEffect, useState } from 'react';
 import { Editor } from '@tiptap/react';
 import { useTheme } from 'next-themes';
-import { SubdirectoryArrowRight } from '@material-ui/icons';
+import { SubdirectoryArrowRight } from '@material-ui/lib';
 
 interface FloatingToolbarProps {
     editor: Editor | null;
