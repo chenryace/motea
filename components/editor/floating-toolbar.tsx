@@ -12,6 +12,7 @@
 import React, { useEffect, useState } from 'react';
 import { Editor } from '@tiptap/react';
 import { useTheme } from 'next-themes';
+import { SubdirectoryArrowRight } from '@material-ui/icons';
 
 interface FloatingToolbarProps {
     editor: Editor | null;
@@ -147,7 +148,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
             title: 'Link'
         },
         {
-            icon: '⇥',
+            icon: <SubdirectoryArrowRight fontSize="small" />,
             action: () => {
                 // 检查是否在列表中
                 const { state } = editor;
@@ -156,7 +157,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
                 let isInList = false;
                 for (let depth = $from.depth; depth >= 0; depth--) {
                     const node = $from.node(depth);
-                    if (['listItem', 'taskItem'].includes(node.type.name)) {
+                    if (['listItem', 'taskItem', 'bulletList', 'orderedList', 'taskList'].includes(node.type.name)) {
                         isInList = true;
                         break;
                     }
@@ -176,43 +177,31 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
                     editor.commands.indent();
                 }
             },
-            isActive: false,
-            title: 'Indent',
-            className: 'font-mono text-lg'
-        },
-        {
-            icon: '⇤',
-            action: () => {
-                // 检查是否在列表中
+            isActive: (() => {
+                // 检查当前节点是否有缩进
                 const { state } = editor;
                 const { $from } = state.selection;
 
+                // 检查是否在列表中
                 let isInList = false;
                 for (let depth = $from.depth; depth >= 0; depth--) {
                     const node = $from.node(depth);
-                    if (['listItem', 'taskItem'].includes(node.type.name)) {
+                    if (['listItem', 'taskItem', 'bulletList', 'orderedList', 'taskList'].includes(node.type.name)) {
                         isInList = true;
                         break;
                     }
                 }
 
                 if (isInList) {
-                    // 列表项取消缩进
-                    if ($from.node(-1)?.type.name === 'listItem' ||
-                        $from.node(-2)?.type.name === 'listItem' ||
-                        $from.node(-3)?.type.name === 'listItem') {
-                        editor.commands.liftListItem('listItem');
-                    } else {
-                        editor.commands.liftListItem('taskItem');
-                    }
+                    // 列表项：检查是否有缩进层级
+                    return $from.depth > 2; // 如果深度大于2，说明有缩进
                 } else {
-                    // 普通文本取消缩进
-                    editor.commands.outdent();
+                    // 普通文本：检查是否有indent属性
+                    const node = $from.parent;
+                    return node.attrs.indent && node.attrs.indent > 0;
                 }
-            },
-            isActive: false,
-            title: 'Outdent',
-            className: 'font-mono text-lg'
+            })(),
+            title: 'Indent / Outdent'
         }
 
     ];

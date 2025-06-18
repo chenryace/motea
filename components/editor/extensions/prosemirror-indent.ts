@@ -19,15 +19,15 @@ const MAX_INDENT = 240; // px
  */
 function isInList(state: any): boolean {
     const { $from } = state.selection;
-    
+
     // 检查当前节点及其父节点
     for (let depth = $from.depth; depth >= 0; depth--) {
         const node = $from.node(depth);
-        if (['listItem', 'taskItem'].includes(node.type.name)) {
+        if (['listItem', 'taskItem', 'bulletList', 'orderedList', 'taskList'].includes(node.type.name)) {
             return true;
         }
     }
-    
+
     return false;
 }
 
