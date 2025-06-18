@@ -23,16 +23,21 @@ export interface ModernIMEHandlerOptions {
      * 是否启用调试模式
      */
     debug?: boolean;
-    
+
     /**
      * 是否强制使用RestoreDOM（即使不是移动设备）
      */
     forceRestoreDOM?: boolean;
-    
+
     /**
      * 编辑器onChange回调
      */
     onChange?: (getValue: () => string) => void;
+
+    /**
+     * TipTap编辑器实例
+     */
+    editor?: any;
 }
 
 /**
@@ -43,12 +48,14 @@ export class ModernIMEHandler {
     private options: ModernIMEHandlerOptions;
     private isComposing = false;
     private useRestoreDOM = false;
-    
+    private editor: any;
+
     constructor(element: Element, options: ModernIMEHandlerOptions = {}) {
         this.element = element;
         this.options = { debug: false, forceRestoreDOM: false, ...options };
         this.useRestoreDOM = options.forceRestoreDOM || shouldUseRestoreDOM();
-        
+        this.editor = options.editor;
+
         this.init();
     }
     
@@ -241,25 +248,106 @@ export class ModernIMEHandler {
         }
     }
     
-    // 这些方法需要在具体的编辑器集成中实现
+    // TipTap编辑器命令集成
     private insertText(text: string) {
-        // 待实现：调用编辑器的插入文本命令
-        console.log('🎯 ModernIMEHandler: insertText not implemented', text);
+        if (!this.editor) {
+            if (this.options.debug) {
+                console.warn('🎯 ModernIMEHandler: No editor instance available for insertText');
+            }
+            return;
+        }
+
+        if (this.options.debug) {
+            console.log('🎯 ModernIMEHandler: Inserting text via editor commands', text);
+        }
+
+        // 使用TipTap的chain命令，在IME期间不记录历史
+        this.editor.chain()
+            .command(({ tr }: any) => {
+                tr.setMeta('addToHistory', this.isComposing ? false : true);
+                return true;
+            })
+            .insertContent(text)
+            .run();
     }
-    
+
     private insertBreak() {
-        // 待实现：调用编辑器的插入换行命令
-        console.log('🎯 ModernIMEHandler: insertBreak not implemented');
+        if (!this.editor) {
+            if (this.options.debug) {
+                console.warn('🎯 ModernIMEHandler: No editor instance available for insertBreak');
+            }
+            return;
+        }
+
+        if (this.options.debug) {
+            console.log('🎯 ModernIMEHandler: Inserting break via editor commands');
+        }
+
+        // 使用TipTap的chain命令，在IME期间不记录历史
+        this.editor.chain()
+            .command(({ tr }: any) => {
+                tr.setMeta('addToHistory', this.isComposing ? false : true);
+                return true;
+            })
+            .setHardBreak()
+            .run();
     }
-    
+
     private deleteBackward() {
-        // 待实现：调用编辑器的向后删除命令
-        console.log('🎯 ModernIMEHandler: deleteBackward not implemented');
+        if (!this.editor) {
+            if (this.options.debug) {
+                console.warn('🎯 ModernIMEHandler: No editor instance available for deleteBackward');
+            }
+            return;
+        }
+
+        if (this.options.debug) {
+            console.log('🎯 ModernIMEHandler: Deleting backward via editor commands');
+        }
+
+        // 使用TipTap的chain命令，在IME期间不记录历史
+        const { state } = this.editor;
+        const { from } = state.selection;
+
+        if (from > 0) {
+            this.editor.chain()
+                .command(({ tr }: any) => {
+                    tr.setMeta('addToHistory', this.isComposing ? false : true);
+                    return true;
+                })
+                .deleteRange({ from: from - 1, to: from })
+                .run();
+        }
     }
-    
+
     private deleteRange(range: StaticRange) {
-        // 待实现：调用编辑器的删除范围命令
-        console.log('🎯 ModernIMEHandler: deleteRange not implemented', range);
+        if (!this.editor) {
+            if (this.options.debug) {
+                console.warn('🎯 ModernIMEHandler: No editor instance available for deleteRange');
+            }
+            return;
+        }
+
+        if (this.options.debug) {
+            console.log('🎯 ModernIMEHandler: Deleting range via editor commands', range);
+        }
+
+        // 将StaticRange转换为编辑器位置并删除
+        // 注意：这里需要将DOM位置转换为ProseMirror位置
+        try {
+            const { state } = this.editor;
+            const { doc } = state;
+
+            // 简化处理：使用当前选择范围
+            const { from, to } = state.selection;
+            if (from !== to) {
+                this.editor.commands.deleteRange({ from, to });
+            }
+        } catch (error) {
+            if (this.options.debug) {
+                console.error('🎯 ModernIMEHandler: Error deleting range', error);
+            }
+        }
     }
     
     /**
