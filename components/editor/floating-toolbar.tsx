@@ -153,40 +153,32 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
                 const { state } = editor;
                 const { $from } = state.selection;
 
-                const isInList = $from.node(-1)?.type.name === 'listItem' ||
-                                $from.node(-2)?.type.name === 'listItem' ||
-                                $from.node(-3)?.type.name === 'listItem';
-
-                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
-                                    $from.node(-2)?.type.name === 'taskItem' ||
-                                    $from.node(-3)?.type.name === 'taskItem';
+                let isInList = false;
+                for (let depth = $from.depth; depth >= 0; depth--) {
+                    const node = $from.node(depth);
+                    if (['listItem', 'taskItem'].includes(node.type.name)) {
+                        isInList = true;
+                        break;
+                    }
+                }
 
                 if (isInList) {
-                    editor.commands.sinkListItem('listItem');
-                } else if (isInTaskList) {
-                    editor.commands.sinkListItem('taskItem');
-                } else {
-                    // 普通文本缩进 - 简单插入空格
-                    const { from, to } = state.selection;
-                    if (from === to) {
-                        // 光标位置插入缩进
-                        editor.commands.insertContent('    ');
+                    // 列表项缩进
+                    if ($from.node(-1)?.type.name === 'listItem' ||
+                        $from.node(-2)?.type.name === 'listItem' ||
+                        $from.node(-3)?.type.name === 'listItem') {
+                        editor.commands.sinkListItem('listItem');
                     } else {
-                        // 选中文本，每行添加缩进
-                        const selectedText = state.doc.textBetween(from, to);
-                        const lines = selectedText.split('\n');
-                        const indentedText = lines.map(line => '    ' + line).join('\n');
-                        editor.chain()
-                            .focus()
-                            .deleteRange({ from, to })
-                            .insertContent(indentedText)
-                            .run();
+                        editor.commands.sinkListItem('taskItem');
                     }
+                } else {
+                    // 普通文本缩进
+                    editor.commands.indent();
                 }
             },
             isActive: false,
-            title: 'Indent (Tab)',
-            className: 'font-mono'
+            title: 'Indent',
+            className: 'font-mono text-lg'
         },
         {
             icon: '⇤',
@@ -195,55 +187,34 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
                 const { state } = editor;
                 const { $from } = state.selection;
 
-                const isInList = $from.node(-1)?.type.name === 'listItem' ||
-                                $from.node(-2)?.type.name === 'listItem' ||
-                                $from.node(-3)?.type.name === 'listItem';
-
-                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
-                                    $from.node(-2)?.type.name === 'taskItem' ||
-                                    $from.node(-3)?.type.name === 'taskItem';
+                let isInList = false;
+                for (let depth = $from.depth; depth >= 0; depth--) {
+                    const node = $from.node(depth);
+                    if (['listItem', 'taskItem'].includes(node.type.name)) {
+                        isInList = true;
+                        break;
+                    }
+                }
 
                 if (isInList) {
-                    editor.commands.liftListItem('listItem');
-                } else if (isInTaskList) {
-                    editor.commands.liftListItem('taskItem');
-                } else {
-                    // 普通文本取消缩进 - 移除开头的空格
-                    const { from, to } = state.selection;
-                    if (from === to) {
-                        // 光标位置，检查并移除前面的缩进
-                        const lineStart = $from.start();
-                        const textFromLineStart = state.doc.textBetween(lineStart, from);
-
-                        if (textFromLineStart.endsWith('    ')) {
-                            editor.commands.deleteRange({ from: from - 4, to: from });
-                        } else if (textFromLineStart.endsWith('\t')) {
-                            editor.commands.deleteRange({ from: from - 1, to: from });
-                        }
+                    // 列表项取消缩进
+                    if ($from.node(-1)?.type.name === 'listItem' ||
+                        $from.node(-2)?.type.name === 'listItem' ||
+                        $from.node(-3)?.type.name === 'listItem') {
+                        editor.commands.liftListItem('listItem');
                     } else {
-                        // 选中文本，每行移除缩进
-                        const selectedText = state.doc.textBetween(from, to);
-                        const lines = selectedText.split('\n');
-                        const outdentedText = lines.map(line => {
-                            if (line.startsWith('    ')) {
-                                return line.slice(4);
-                            } else if (line.startsWith('\t')) {
-                                return line.slice(1);
-                            }
-                            return line;
-                        }).join('\n');
-                        editor.chain()
-                            .focus()
-                            .deleteRange({ from, to })
-                            .insertContent(outdentedText)
-                            .run();
+                        editor.commands.liftListItem('taskItem');
                     }
+                } else {
+                    // 普通文本取消缩进
+                    editor.commands.outdent();
                 }
             },
             isActive: false,
-            title: 'Outdent (Shift+Tab)',
-            className: 'font-mono'
+            title: 'Outdent',
+            className: 'font-mono text-lg'
         }
+
     ];
 
     return (
