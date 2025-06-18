@@ -18,71 +18,82 @@ export const UniversalIndentExtension = Extension.create({
             indent: () => ({ state, dispatch }: any) => {
                 const { selection } = state;
                 const { from, to, $from } = selection;
-                
-                // 检查是否在列表项中，如果是，使用列表的缩进
-                const isInList = $from.node(-1)?.type.name === 'listItem' ||
-                                $from.node(-2)?.type.name === 'listItem' ||
-                                $from.node(-3)?.type.name === 'listItem';
-                
-                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
-                                    $from.node(-2)?.type.name === 'taskItem' ||
-                                    $from.node(-3)?.type.name === 'taskItem';
-                
-                if (isInList) {
-                    return this.editor.commands.sinkListItem('listItem');
+
+                // 首先尝试列表项缩进（TipTap会自动处理多选情况）
+                if (this.editor.commands.sinkListItem('listItem')) {
+                    return true;
                 }
-                
-                if (isInTaskList) {
-                    return this.editor.commands.sinkListItem('taskItem');
+
+                if (this.editor.commands.sinkListItem('taskItem')) {
+                    return true;
                 }
-                
-                // 通用缩进：处理选中文本或光标位置
+
+                // 如果不是列表项，处理普通文本缩进
+                return this.handleTextIndent(state, dispatch, from, to);
+            },
+            
+            // 通用取消缩进命令
+            outdent: () => ({ state, dispatch }: any) => {
+                const { selection } = state;
+                const { from, to } = selection;
+
+                // 首先尝试列表项取消缩进（TipTap会自动处理多选情况）
+                if (this.editor.commands.liftListItem('listItem')) {
+                    return true;
+                }
+
+                if (this.editor.commands.liftListItem('taskItem')) {
+                    return true;
+                }
+
+                // 如果不是列表项，处理普通文本取消缩进
+                return this.handleTextOutdent(state, dispatch, from, to);
+            },
+            // 处理普通文本缩进
+            handleTextIndent: (state: any, dispatch: any, from: number, to: number) => {
                 if (from === to) {
                     // 光标位置，插入缩进
                     const tr = state.tr.insertText('    ', from);
                     if (dispatch) dispatch(tr);
                     return true;
                 } else {
-                    // 选中文本，对每行添加缩进
-                    const selectedText = state.doc.textBetween(from, to);
-                    const lines = selectedText.split('\n');
-                    const indentedText = lines.map((line: string) => '    ' + line).join('\n');
-                    
-                    const tr = state.tr.replaceWith(from, to, state.schema.text(indentedText));
+                    // 选中文本，逐行处理缩进
+                    const tr = state.tr;
+                    let offset = 0;
+
+                    // 找到选中范围内的所有行开始位置
+                    const doc = state.doc;
+                    const startLine = doc.resolve(from);
+                    const endLine = doc.resolve(to);
+
+                    // 从后往前处理，避免位置偏移问题
+                    for (let pos = to; pos >= from; pos--) {
+                        const resolved = doc.resolve(pos);
+                        const char = doc.textBetween(pos, pos + 1);
+
+                        // 如果是换行符的下一个位置，或者是选择的开始位置
+                        if (char === '\n' || pos === from) {
+                            const insertPos = char === '\n' ? pos + 1 : pos;
+                            if (insertPos <= to + offset) {
+                                tr.insertText('    ', insertPos);
+                                offset += 4;
+                            }
+                        }
+                    }
+
                     if (dispatch) dispatch(tr);
                     return true;
                 }
             },
-            
-            // 通用取消缩进命令
-            outdent: () => ({ state, dispatch }: any) => {
-                const { selection } = state;
-                const { from, to, $from } = selection;
-                
-                // 检查是否在列表项中，如果是，使用列表的取消缩进
-                const isInList = $from.node(-1)?.type.name === 'listItem' ||
-                                $from.node(-2)?.type.name === 'listItem' ||
-                                $from.node(-3)?.type.name === 'listItem';
-                
-                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
-                                    $from.node(-2)?.type.name === 'taskItem' ||
-                                    $from.node(-3)?.type.name === 'taskItem';
-                
-                if (isInList) {
-                    return this.editor.commands.liftListItem('listItem');
-                }
-                
-                if (isInTaskList) {
-                    return this.editor.commands.liftListItem('taskItem');
-                }
-                
-                // 通用取消缩进
+
+            // 处理普通文本取消缩进
+            handleTextOutdent: (state: any, dispatch: any, from: number, to: number) => {
                 if (from === to) {
                     // 光标位置，检查并移除前面的缩进
+                    const { $from } = state.selection;
                     const lineStart = $from.start();
                     const textFromLineStart = state.doc.textBetween(lineStart, from);
-                    
-                    // 检查是否有缩进可以移除
+
                     if (textFromLineStart.endsWith('    ')) {
                         const tr = state.tr.delete(from - 4, from);
                         if (dispatch) dispatch(tr);
@@ -93,23 +104,38 @@ export const UniversalIndentExtension = Extension.create({
                         return true;
                     }
                 } else {
-                    // 选中文本，对每行移除缩进
-                    const selectedText = state.doc.textBetween(from, to);
-                    const lines = selectedText.split('\n');
-                    const outdentedText = lines.map((line: string) => {
-                        if (line.startsWith('    ')) {
-                            return line.substring(4);
-                        } else if (line.startsWith('\t')) {
-                            return line.substring(1);
+                    // 选中文本，逐行处理取消缩进
+                    const tr = state.tr;
+                    let offset = 0;
+                    const doc = state.doc;
+
+                    // 从后往前处理，避免位置偏移问题
+                    for (let pos = to; pos >= from; pos--) {
+                        const char = doc.textBetween(pos, pos + 1);
+
+                        // 如果是换行符的下一个位置，或者是选择的开始位置
+                        if (char === '\n' || pos === from) {
+                            const checkPos = char === '\n' ? pos + 1 : pos;
+                            if (checkPos <= to + offset) {
+                                // 检查这个位置开始是否有缩进
+                                const nextFour = doc.textBetween(checkPos, checkPos + 4);
+                                const nextOne = doc.textBetween(checkPos, checkPos + 1);
+
+                                if (nextFour === '    ') {
+                                    tr.delete(checkPos, checkPos + 4);
+                                    offset -= 4;
+                                } else if (nextOne === '\t') {
+                                    tr.delete(checkPos, checkPos + 1);
+                                    offset -= 1;
+                                }
+                            }
                         }
-                        return line;
-                    }).join('\n');
-                    
-                    const tr = state.tr.replaceWith(from, to, state.schema.text(outdentedText));
+                    }
+
                     if (dispatch) dispatch(tr);
                     return true;
                 }
-                
+
                 return false;
             },
         };
