@@ -147,18 +147,102 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
             title: 'Link'
         },
         {
-            icon: '→',
-            action: () => editor.commands.indent(),
+            icon: '⇥',
+            action: () => {
+                // 检查是否在列表中
+                const { state } = editor;
+                const { $from } = state.selection;
+
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList) {
+                    editor.commands.sinkListItem('listItem');
+                } else if (isInTaskList) {
+                    editor.commands.sinkListItem('taskItem');
+                } else {
+                    // 普通文本缩进 - 简单插入空格
+                    const { from, to } = state.selection;
+                    if (from === to) {
+                        // 光标位置插入缩进
+                        editor.commands.insertContent('    ');
+                    } else {
+                        // 选中文本，每行添加缩进
+                        const selectedText = state.doc.textBetween(from, to);
+                        const lines = selectedText.split('\n');
+                        const indentedText = lines.map(line => '    ' + line).join('\n');
+                        editor.chain()
+                            .focus()
+                            .deleteRange({ from, to })
+                            .insertContent(indentedText)
+                            .run();
+                    }
+                }
+            },
             isActive: false,
             title: 'Indent (Tab)',
-            className: 'font-bold'
+            className: 'font-mono'
         },
         {
-            icon: '←',
-            action: () => editor.commands.outdent(),
+            icon: '⇤',
+            action: () => {
+                // 检查是否在列表中
+                const { state } = editor;
+                const { $from } = state.selection;
+
+                const isInList = $from.node(-1)?.type.name === 'listItem' ||
+                                $from.node(-2)?.type.name === 'listItem' ||
+                                $from.node(-3)?.type.name === 'listItem';
+
+                const isInTaskList = $from.node(-1)?.type.name === 'taskItem' ||
+                                    $from.node(-2)?.type.name === 'taskItem' ||
+                                    $from.node(-3)?.type.name === 'taskItem';
+
+                if (isInList) {
+                    editor.commands.liftListItem('listItem');
+                } else if (isInTaskList) {
+                    editor.commands.liftListItem('taskItem');
+                } else {
+                    // 普通文本取消缩进 - 移除开头的空格
+                    const { from, to } = state.selection;
+                    if (from === to) {
+                        // 光标位置，检查并移除前面的缩进
+                        const lineStart = $from.start();
+                        const textFromLineStart = state.doc.textBetween(lineStart, from);
+
+                        if (textFromLineStart.endsWith('    ')) {
+                            editor.commands.deleteRange({ from: from - 4, to: from });
+                        } else if (textFromLineStart.endsWith('\t')) {
+                            editor.commands.deleteRange({ from: from - 1, to: from });
+                        }
+                    } else {
+                        // 选中文本，每行移除缩进
+                        const selectedText = state.doc.textBetween(from, to);
+                        const lines = selectedText.split('\n');
+                        const outdentedText = lines.map(line => {
+                            if (line.startsWith('    ')) {
+                                return line.slice(4);
+                            } else if (line.startsWith('\t')) {
+                                return line.slice(1);
+                            }
+                            return line;
+                        }).join('\n');
+                        editor.chain()
+                            .focus()
+                            .deleteRange({ from, to })
+                            .insertContent(outdentedText)
+                            .run();
+                    }
+                }
+            },
             isActive: false,
             title: 'Outdent (Shift+Tab)',
-            className: 'font-bold'
+            className: 'font-mono'
         }
     ];
 
