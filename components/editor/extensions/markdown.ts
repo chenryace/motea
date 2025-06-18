@@ -16,7 +16,43 @@
  */
 
 import { Extension, Node } from '@tiptap/core';
-import { textblockTypeInputRule, mergeAttributes } from '@tiptap/core';
+import { textblockTypeInputRule, mergeAttributes, InputRule } from '@tiptap/core';
+
+// IME安全的InputRule包装器
+function createIMESafeInputRule(options: any): InputRule {
+    const originalHandler = options.handler || ((state: any, match: any, start: number, end: number) => {
+        return options.type ? state.tr.setBlockType(start, end, options.type, options.getAttributes ? options.getAttributes(match) : {}) : null;
+    });
+
+    return new InputRule({
+        ...options,
+        handler: (state: any, match: any, start: number, end: number) => {
+            // 检查是否在IME组合中
+            if (state.view?.composing) {
+                return null; // 阻止执行
+            }
+
+            return originalHandler(state, match, start, end);
+        }
+    });
+}
+
+// IME安全的textblockTypeInputRule包装器
+function createIMESafeTextblockRule(options: any) {
+    return createIMESafeInputRule({
+        find: options.find,
+        type: options.type,
+        getAttributes: options.getAttributes,
+        handler: (state: any, match: any, start: number, end: number) => {
+            if (state.view?.composing) {
+                return null;
+            }
+
+            const attrs = options.getAttributes ? options.getAttributes(match) : {};
+            return state.tr.setBlockType(start, end, options.type, attrs);
+        }
+    });
+}
 
 // 检查是否是markdown内容
 function isMarkdownContent(text: string): boolean {
@@ -374,43 +410,43 @@ export const MarkdownExtension = Extension.create({
 
     addInputRules() {
         return [
-            // 标题输入规则
-            textblockTypeInputRule({
+            // IME安全的标题输入规则
+            createIMESafeTextblockRule({
                 find: /^(#)\s$/,
                 type: this.editor.schema.nodes.heading,
                 getAttributes: () => ({ level: 1 }),
             }),
-            textblockTypeInputRule({
+            createIMESafeTextblockRule({
                 find: /^(##)\s$/,
                 type: this.editor.schema.nodes.heading,
                 getAttributes: () => ({ level: 2 }),
             }),
-            textblockTypeInputRule({
+            createIMESafeTextblockRule({
                 find: /^(###)\s$/,
                 type: this.editor.schema.nodes.heading,
                 getAttributes: () => ({ level: 3 }),
             }),
-            textblockTypeInputRule({
+            createIMESafeTextblockRule({
                 find: /^(####)\s$/,
                 type: this.editor.schema.nodes.heading,
                 getAttributes: () => ({ level: 4 }),
             }),
-            textblockTypeInputRule({
+            createIMESafeTextblockRule({
                 find: /^(#####)\s$/,
                 type: this.editor.schema.nodes.heading,
                 getAttributes: () => ({ level: 5 }),
             }),
-            textblockTypeInputRule({
+            createIMESafeTextblockRule({
                 find: /^(######)\s$/,
                 type: this.editor.schema.nodes.heading,
                 getAttributes: () => ({ level: 6 }),
             }),
-            // 列表输入规则
-            textblockTypeInputRule({
+            // IME安全的列表输入规则
+            createIMESafeTextblockRule({
                 find: /^[-*] $/,
                 type: this.editor.schema.nodes.bulletList
             }),
-            textblockTypeInputRule({
+            createIMESafeTextblockRule({
                 find: /^1[.)] $/,
                 type: this.editor.schema.nodes.orderedList
             })
@@ -423,7 +459,17 @@ export const MarkdownExtension = Extension.create({
                 key: new (require('prosemirror-state').PluginKey)('headingInputHandler'),
                 props: {
                     handleTextInput: (view: any, from: number, to: number, text: string) => {
+                        // IME安全检查：如果正在组合输入，不处理文本输入转换
+                        if (view.composing) {
+                            return false;
+                        }
+
                         setTimeout(() => {
+                            // 再次检查IME状态，因为setTimeout可能在组合结束后执行
+                            if (view.composing) {
+                                return;
+                            }
+
                             const { state } = view;
                             const { $from } = state.selection;
                             const textBefore = $from.parent.textContent.slice(0, $from.parentOffset);
@@ -458,6 +504,11 @@ export const MarkdownExtension = Extension.create({
                 key: new (require('prosemirror-state').PluginKey)('enhancedPasteHandler'),
                 props: {
                     handlePaste: (view: any, event: ClipboardEvent, slice: any) => {
+                        // IME安全检查：如果正在组合输入，不处理粘贴
+                        if (view.composing) {
+                            return false; // 让默认处理器处理
+                        }
+
                         const clipboardData = event.clipboardData;
                         if (!clipboardData) return false;
 

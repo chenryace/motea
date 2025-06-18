@@ -59,6 +59,7 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                             imeHandler = new ModernIMEHandler(editableElement, {
                                 debug: this.options.debug,
                                 forceRestoreDOM: this.options.forceRestoreDOM,
+                                editor: this.editor, // 传递编辑器实例
                                 onChange: (getValue) => {
                                     // 这里可以添加额外的onChange处理
                                     if (this.options.debug) {
@@ -131,19 +132,25 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                                             case 'insertText':
                                                 if (data) {
                                                     if (data.includes('\n')) {
-                                                        // 插入换行
-                                                        const tr = state.tr.split(state.selection.from);
+                                                        // 插入换行 - IME期间不记录历史
+                                                        const tr = state.tr
+                                                            .split(state.selection.from)
+                                                            .setMeta('addToHistory', false);
                                                         dispatch(tr);
                                                     } else {
-                                                        // 插入文本
-                                                        const tr = state.tr.insertText(data, state.selection.from, state.selection.to);
+                                                        // 插入文本 - IME期间不记录历史
+                                                        const tr = state.tr
+                                                            .insertText(data, state.selection.from, state.selection.to)
+                                                            .setMeta('addToHistory', false);
                                                         dispatch(tr);
                                                     }
                                                 }
                                                 break;
                                             case 'deleteContentBackward':
-                                                // 向后删除
-                                                const tr = state.tr.delete(state.selection.from - 1, state.selection.from);
+                                                // 向后删除 - IME期间不记录历史
+                                                const tr = state.tr
+                                                    .delete(state.selection.from - 1, state.selection.from)
+                                                    .setMeta('addToHistory', false);
                                                 dispatch(tr);
                                                 break;
                                         }
