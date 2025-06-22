@@ -14,11 +14,31 @@ export interface RestoreDOMOptions {
      * 是否启用调试模式
      */
     debug?: boolean;
-    
+
     /**
      * 超时时间（毫秒），防止observer永远不断开
      */
     timeout?: number;
+
+    /**
+     * 只恢复特定类型的变化
+     */
+    restoreTypes?: ('childList' | 'characterData' | 'attributes')[];
+
+    /**
+     * 排除特定的节点
+     */
+    excludeNodes?: (node: Node) => boolean;
+
+    /**
+     * 只在特定条件下恢复
+     */
+    shouldRestore?: (mutation: MutationRecord) => boolean;
+
+    /**
+     * 是否跳过characterData类型的恢复（推荐用于IME）
+     */
+    skipCharacterData?: boolean;
 }
 
 /**
@@ -33,10 +53,17 @@ export function restoreDOM(
     execute: () => void,
     options: RestoreDOMOptions = {}
 ): void {
-    const { debug = false, timeout = 100 } = options;
-    
+    const {
+        debug = false,
+        timeout = 100,
+        restoreTypes = ['childList'],
+        excludeNodes,
+        shouldRestore,
+        skipCharacterData = true
+    } = options;
+
     if (debug) {
-        console.log('🔄 RestoreDOM: Starting DOM restoration cycle');
+        console.log('🔄 RestoreDOM: Starting DOM restoration cycle', { restoreTypes, skipCharacterData });
     }
 
     let observer: MutationObserver | null = new MutationObserver((mutations) => {
@@ -44,30 +71,92 @@ export function restoreDOM(
             console.log('🔄 RestoreDOM: Detected DOM mutations:', mutations.length);
         }
 
-        // 反向处理mutations，确保正确恢复
-        mutations.reverse().forEach((mutation) => {
-            if (mutation.type === 'characterData') {
-                // 不恢复characterData类型的变化，因为这会中断composition
+        // 筛选需要恢复的mutations
+        const filteredMutations = mutations.filter(mutation => {
+            // 检查类型筛选
+            if (!restoreTypes.includes(mutation.type as any)) {
                 if (debug) {
-                    console.log('🔄 RestoreDOM: Skipping characterData mutation');
+                    console.log('🔄 RestoreDOM: Skipping mutation type:', mutation.type);
                 }
-                return;
+                return false;
             }
 
+            // 跳过characterData类型（用于IME兼容性）
+            if (skipCharacterData && mutation.type === 'characterData') {
+                if (debug) {
+                    console.log('🔄 RestoreDOM: Skipping characterData mutation for IME compatibility');
+                }
+                return false;
+            }
+
+            // 自定义筛选逻辑
+            if (shouldRestore && !shouldRestore(mutation)) {
+                if (debug) {
+                    console.log('🔄 RestoreDOM: Custom filter rejected mutation');
+                }
+                return false;
+            }
+
+            return true;
+        });
+
+        if (filteredMutations.length === 0) {
+            if (debug) {
+                console.log('🔄 RestoreDOM: No mutations to restore, executing callback directly');
+            }
+            disconnect();
+            execute();
+            return;
+        }
+
+        // 反向处理筛选后的mutations，确保正确恢复
+        filteredMutations.reverse().forEach((mutation) => {
             // 恢复被删除的节点
             mutation.removedNodes.forEach((node) => {
+                // 检查节点排除规则
+                if (excludeNodes && excludeNodes(node)) {
+                    if (debug) {
+                        console.log('🔄 RestoreDOM: Excluding removed node:', node);
+                    }
+                    return;
+                }
+
                 if (debug) {
                     console.log('🔄 RestoreDOM: Restoring removed node:', node);
                 }
-                mutation.target.insertBefore(node, mutation.nextSibling);
+
+                try {
+                    mutation.target.insertBefore(node, mutation.nextSibling);
+                } catch (error) {
+                    if (debug) {
+                        console.warn('🔄 RestoreDOM: Failed to restore removed node:', error);
+                    }
+                }
             });
 
             // 移除被添加的节点
             mutation.addedNodes.forEach((node) => {
+                // 检查节点排除规则
+                if (excludeNodes && excludeNodes(node)) {
+                    if (debug) {
+                        console.log('🔄 RestoreDOM: Excluding added node:', node);
+                    }
+                    return;
+                }
+
                 if (debug) {
                     console.log('🔄 RestoreDOM: Removing added node:', node);
                 }
-                mutation.target.removeChild(node);
+
+                try {
+                    if (node.parentNode) {
+                        node.parentNode.removeChild(node);
+                    }
+                } catch (error) {
+                    if (debug) {
+                        console.warn('🔄 RestoreDOM: Failed to remove added node:', error);
+                    }
+                }
             });
         });
 
@@ -86,13 +175,17 @@ export function restoreDOM(
         }
     };
 
-    // 开始监听DOM变化
-    observer.observe(element, {
+    // 开始监听DOM变化 - 根据配置动态设置监听选项
+    const observeOptions: MutationObserverInit = {
         subtree: true,
-        childList: true,
-        characterData: true,
-        characterDataOldValue: true,
-    });
+        childList: restoreTypes.includes('childList'),
+        characterData: restoreTypes.includes('characterData'),
+        attributes: restoreTypes.includes('attributes'),
+        characterDataOldValue: restoreTypes.includes('characterData'),
+        attributeOldValue: restoreTypes.includes('attributes')
+    };
+
+    observer.observe(element, observeOptions);
 
     // 设置超时保护，防止observer永远不断开
     setTimeout(() => {

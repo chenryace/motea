@@ -19,8 +19,7 @@ import UIState from 'libs/web/state/ui';
 import { has } from 'lodash';
 // import { ROOT_ID } from 'libs/shared/const';
 import { parseMarkdownTitle } from 'libs/shared/markdown/parse-markdown-title';
-import { wrapEditorChangeForIME } from 'libs/web/utils/simple-ime-fix';
-import { createSmartOnChange } from 'libs/web/utils/input-state-tracker';
+import { createSmartOnChange } from 'libs/web/utils/ime-state-manager';
 const ROOT_ID = 'root';
 
 const useTiptapEditor = (initNote?: NoteModel) => {

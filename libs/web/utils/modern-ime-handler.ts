@@ -18,21 +18,58 @@ export interface IMEInputEvent {
     isComposing: boolean;
 }
 
+export interface TipTapEditorInterface {
+    /**
+     * TipTap编辑器实例
+     */
+    editor: any;
+
+    /**
+     * 获取当前选区
+     */
+    getSelection(): { from: number; to: number };
+
+    /**
+     * 插入文本
+     */
+    insertText(text: string, from?: number, to?: number): boolean;
+
+    /**
+     * 删除内容
+     */
+    deleteRange(from: number, to: number): boolean;
+
+    /**
+     * 向后删除
+     */
+    deleteBackward(count?: number): boolean;
+
+    /**
+     * 插入换行
+     */
+    insertBreak(): boolean;
+}
+
 export interface ModernIMEHandlerOptions {
     /**
      * 是否启用调试模式
      */
     debug?: boolean;
-    
+
     /**
      * 是否强制使用RestoreDOM（即使不是移动设备）
      */
     forceRestoreDOM?: boolean;
-    
+
     /**
      * 编辑器onChange回调
      */
     onChange?: (getValue: () => string) => void;
+
+    /**
+     * TipTap编辑器接口
+     */
+    editorInterface?: TipTapEditorInterface;
 }
 
 /**
@@ -43,12 +80,19 @@ export class ModernIMEHandler {
     private options: ModernIMEHandlerOptions;
     private isComposing = false;
     private useRestoreDOM = false;
-    
+
+    // 保存绑定后的事件处理器引用，确保可以正确移除
+    private boundHandlers = {
+        compositionStart: this.handleCompositionStart.bind(this),
+        compositionEnd: this.handleCompositionEnd.bind(this),
+        beforeInput: this.handleBeforeInput.bind(this)
+    };
+
     constructor(element: Element, options: ModernIMEHandlerOptions = {}) {
         this.element = element;
         this.options = { debug: false, forceRestoreDOM: false, ...options };
         this.useRestoreDOM = options.forceRestoreDOM || shouldUseRestoreDOM();
-        
+
         this.init();
     }
     
@@ -70,14 +114,12 @@ export class ModernIMEHandler {
             console.warn('🎯 ModernIMEHandler: No editable element found');
             return;
         }
-        
-        // 监听composition事件
-        editableElement.addEventListener('compositionstart', this.handleCompositionStart.bind(this));
-        editableElement.addEventListener('compositionend', this.handleCompositionEnd.bind(this));
-        
-        // 监听beforeinput事件（核心）
-        editableElement.addEventListener('beforeinput', this.handleBeforeInput.bind(this));
-        
+
+        // 使用预绑定的事件处理器，确保可以正确移除
+        editableElement.addEventListener('compositionstart', this.boundHandlers.compositionStart);
+        editableElement.addEventListener('compositionend', this.boundHandlers.compositionEnd);
+        editableElement.addEventListener('beforeinput', this.boundHandlers.beforeInput);
+
         if (this.options.debug) {
             console.log('🎯 ModernIMEHandler: Event listeners bound to', editableElement);
         }
@@ -160,7 +202,30 @@ export class ModernIMEHandler {
             this.executeEditorOperation(inputType, data, targetRanges);
         }, {
             debug: this.options.debug,
-            timeout: 50 // 较短的超时时间，因为我们知道会有DOM变化
+            timeout: 50, // 较短的超时时间，因为我们知道会有DOM变化
+            restoreTypes: ['childList'], // 只恢复子节点变化，避免影响文本内容
+            skipCharacterData: true, // 跳过字符数据变化，保持IME兼容性
+            shouldRestore: (mutation) => {
+                // 只恢复与IME输入相关的DOM变化
+                if (mutation.type === 'childList') {
+                    // 检查是否是IME相关的节点变化
+                    const hasTextNodes = Array.from(mutation.addedNodes).some(node =>
+                        node.nodeType === Node.TEXT_NODE ||
+                        (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'SPAN')
+                    );
+                    return hasTextNodes;
+                }
+                return false;
+            },
+            excludeNodes: (node) => {
+                // 排除编辑器自身的结构节点
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const element = node as Element;
+                    const excludeClasses = ['ProseMirror', 'tiptap-editor'];
+                    return excludeClasses.some(cls => element.classList?.contains(cls));
+                }
+                return false;
+            }
         });
     }
     
@@ -241,39 +306,139 @@ export class ModernIMEHandler {
         }
     }
     
-    // 这些方法需要在具体的编辑器集成中实现
+    // TipTap编辑器命令集成
     private insertText(text: string) {
-        // 待实现：调用编辑器的插入文本命令
-        console.log('🎯 ModernIMEHandler: insertText not implemented', text);
+        if (!this.options.editorInterface) {
+            if (this.options.debug) {
+                console.warn('🎯 ModernIMEHandler: No editor interface provided, cannot insert text');
+            }
+            return false;
+        }
+
+        try {
+            const success = this.options.editorInterface.insertText(text);
+            if (this.options.debug) {
+                console.log('🎯 ModernIMEHandler: insertText', text, success ? 'success' : 'failed');
+            }
+            return success;
+        } catch (error) {
+            if (this.options.debug) {
+                console.error('🎯 ModernIMEHandler: insertText error', error);
+            }
+            return false;
+        }
     }
-    
+
     private insertBreak() {
-        // 待实现：调用编辑器的插入换行命令
-        console.log('🎯 ModernIMEHandler: insertBreak not implemented');
+        if (!this.options.editorInterface) {
+            if (this.options.debug) {
+                console.warn('🎯 ModernIMEHandler: No editor interface provided, cannot insert break');
+            }
+            return false;
+        }
+
+        try {
+            const success = this.options.editorInterface.insertBreak();
+            if (this.options.debug) {
+                console.log('🎯 ModernIMEHandler: insertBreak', success ? 'success' : 'failed');
+            }
+            return success;
+        } catch (error) {
+            if (this.options.debug) {
+                console.error('🎯 ModernIMEHandler: insertBreak error', error);
+            }
+            return false;
+        }
     }
-    
-    private deleteBackward() {
-        // 待实现：调用编辑器的向后删除命令
-        console.log('🎯 ModernIMEHandler: deleteBackward not implemented');
+
+    private deleteBackward(count: number = 1) {
+        if (!this.options.editorInterface) {
+            if (this.options.debug) {
+                console.warn('🎯 ModernIMEHandler: No editor interface provided, cannot delete backward');
+            }
+            return false;
+        }
+
+        try {
+            const success = this.options.editorInterface.deleteBackward(count);
+            if (this.options.debug) {
+                console.log('🎯 ModernIMEHandler: deleteBackward', count, success ? 'success' : 'failed');
+            }
+            return success;
+        } catch (error) {
+            if (this.options.debug) {
+                console.error('🎯 ModernIMEHandler: deleteBackward error', error);
+            }
+            return false;
+        }
     }
-    
+
     private deleteRange(range: StaticRange) {
-        // 待实现：调用编辑器的删除范围命令
-        console.log('🎯 ModernIMEHandler: deleteRange not implemented', range);
+        if (!this.options.editorInterface) {
+            if (this.options.debug) {
+                console.warn('🎯 ModernIMEHandler: No editor interface provided, cannot delete range');
+            }
+            return false;
+        }
+
+        try {
+            // 将StaticRange转换为编辑器位置
+            const from = this.convertDOMPositionToEditorPosition(range.startContainer, range.startOffset);
+            const to = this.convertDOMPositionToEditorPosition(range.endContainer, range.endOffset);
+
+            if (from !== null && to !== null) {
+                const success = this.options.editorInterface.deleteRange(from, to);
+                if (this.options.debug) {
+                    console.log('🎯 ModernIMEHandler: deleteRange', { from, to }, success ? 'success' : 'failed');
+                }
+                return success;
+            } else {
+                if (this.options.debug) {
+                    console.warn('🎯 ModernIMEHandler: Could not convert DOM range to editor positions');
+                }
+                return false;
+            }
+        } catch (error) {
+            if (this.options.debug) {
+                console.error('🎯 ModernIMEHandler: deleteRange error', error);
+            }
+            return false;
+        }
+    }
+
+    /**
+     * 将DOM位置转换为编辑器位置
+     * 这是一个简化的实现，实际可能需要更复杂的逻辑
+     */
+    private convertDOMPositionToEditorPosition(container: Node, offset: number): number | null {
+        if (!this.options.editorInterface?.editor) {
+            return null;
+        }
+
+        try {
+            // 使用ProseMirror的posAtDOM方法
+            const pos = this.options.editorInterface.editor.view.posAtDOM(container, offset);
+            return pos;
+        } catch (error) {
+            if (this.options.debug) {
+                console.error('🎯 ModernIMEHandler: convertDOMPositionToEditorPosition error', error);
+            }
+            return null;
+        }
     }
     
     /**
      * 销毁处理器
      */
     destroy() {
-        // 移除事件监听器
+        // 使用预绑定的事件处理器引用，确保正确移除
         const editableElement = getEditableElement(this.element);
         if (editableElement) {
-            editableElement.removeEventListener('compositionstart', this.handleCompositionStart.bind(this));
-            editableElement.removeEventListener('compositionend', this.handleCompositionEnd.bind(this));
-            editableElement.removeEventListener('beforeinput', this.handleBeforeInput.bind(this));
+            editableElement.removeEventListener('compositionstart', this.boundHandlers.compositionStart);
+            editableElement.removeEventListener('compositionend', this.boundHandlers.compositionEnd);
+            editableElement.removeEventListener('beforeinput', this.boundHandlers.beforeInput);
         }
-        
+
         if (this.options.debug) {
             console.log('🎯 ModernIMEHandler: Destroyed');
         }
