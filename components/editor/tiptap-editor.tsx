@@ -34,6 +34,7 @@ import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
 import IMEFix from './extensions/ime-fix';
+import Indent from './extensions/indent';
 import FloatingToolbar from './floating-toolbar';
 
 export interface TiptapEditorProps {
@@ -113,6 +114,12 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 enabled: true,
                 debug: process.env.NODE_ENV === 'development', // 开发环境启用调试
                 forceRestoreDOM: false,
+            }),
+            // 缩进扩展
+            Indent.configure({
+                indentSize: 2, // 每级缩进2个空格
+                maxIndentLevel: 10, // 最大10级缩进
+                types: ['paragraph', 'heading', 'blockquote'], // 支持缩进的节点类型
             }),
         ],
         content: value,
@@ -467,6 +474,23 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
 
                 .dark .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
                     color: #9ca3af;
+                }
+
+                /* 缩进样式 */
+                .ProseMirror [style*="margin-left"] {
+                    transition: margin-left 0.2s ease;
+                }
+
+                /* 确保缩进的元素保持正确的间距 */
+                .ProseMirror p[style*="margin-left"],
+                .ProseMirror h1[style*="margin-left"],
+                .ProseMirror h2[style*="margin-left"],
+                .ProseMirror h3[style*="margin-left"],
+                .ProseMirror h4[style*="margin-left"],
+                .ProseMirror h5[style*="margin-left"],
+                .ProseMirror h6[style*="margin-left"],
+                .ProseMirror blockquote[style*="margin-left"] {
+                    position: relative;
                 }
             `}</style>
         </div>

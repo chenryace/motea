@@ -145,6 +145,18 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ editor }) => {
             },
             isActive: editor.isActive('link'),
             title: 'Link'
+        },
+        {
+            icon: '→',
+            action: () => editor.chain().focus().indent().run(),
+            isActive: false,
+            title: 'Indent (Tab)'
+        },
+        {
+            icon: '←',
+            action: () => editor.chain().focus().outdent().run(),
+            isActive: false,
+            title: 'Outdent (Shift+Tab)'
         }
     ];
 
