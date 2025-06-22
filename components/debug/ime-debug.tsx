@@ -4,32 +4,23 @@
  */
 
 import { FC, useState, useEffect } from 'react';
-import { getIMEDebugInfo, isCurrentlyComposing } from 'libs/web/utils/simple-ime-fix';
-import { getGlobalInputTracker, InputState } from 'libs/web/utils/input-state-tracker';
+import { getGlobalIMEStateManager, IMEState } from 'libs/web/utils/ime-state-manager';
 
 interface IMEDebugProps {
     enabled?: boolean;
     position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
 
-const IMEDebug: FC<IMEDebugProps> = ({ 
+const IMEDebug: FC<IMEDebugProps> = ({
     enabled = process.env.NODE_ENV === 'development',
-    position = 'bottom-right' 
+    position = 'bottom-right'
 }) => {
-    const [debugInfo, setDebugInfo] = useState({
-        globalComposingState: false,
-        windowComposingState: false,
-        listenersAdded: false,
+    const [imeState, setIMEState] = useState<IMEState>({
         isComposing: false,
-        lastUpdate: Date.now(),
-    });
-
-    const [inputState, setInputState] = useState<InputState>({
         isTyping: false,
-        isComposing: false,
         isDeleting: false,
         lastInputTime: 0,
-        inputBuffer: [],
+        lastInputType: null,
         fastTypingThreshold: 100
     });
 
@@ -38,52 +29,42 @@ const IMEDebug: FC<IMEDebugProps> = ({
     useEffect(() => {
         if (!enabled) return;
 
-        const updateDebugInfo = () => {
-            const info = getIMEDebugInfo();
-            setDebugInfo({
-                ...info,
-                isComposing: isCurrentlyComposing(),
-                lastUpdate: Date.now(),
-            });
-        };
-
-        // 订阅输入状态变化
-        const inputTracker = getGlobalInputTracker();
-        const unsubscribe = inputTracker.subscribe((state) => {
-            setInputState(state);
+        // 订阅IME状态变化
+        const stateManager = getGlobalIMEStateManager();
+        const unsubscribe = stateManager.subscribe((state) => {
+            setIMEState(state);
         });
 
-        // 高频更新调试信息
-        const interval = setInterval(updateDebugInfo, 100);
+        // 初始化状态
+        setIMEState(stateManager.getState());
 
         // 监听composition和beforeinput事件并记录日志
         const logCompositionEvent = (eventType: string) => (event: CompositionEvent) => {
             const timestamp = new Date().toLocaleTimeString();
             const logEntry = `${timestamp}: ${eventType} - "${event.data || ''}"`;
-
             setEventLog(prev => [...prev.slice(-9), logEntry]); // 保留最近10条
-            updateDebugInfo();
         };
 
         const logBeforeInputEvent = (event: InputEvent) => {
             const timestamp = new Date().toLocaleTimeString();
             const logEntry = `${timestamp}: BEFOREINPUT - ${event.inputType} "${event.data || ''}"`;
-
             setEventLog(prev => [...prev.slice(-9), logEntry]);
-            updateDebugInfo();
         };
 
-        document.addEventListener('compositionstart', logCompositionEvent('COMP_START'), true);
-        document.addEventListener('compositionupdate', logCompositionEvent('COMP_UPDATE'), true);
-        document.addEventListener('compositionend', logCompositionEvent('COMP_END'), true);
+        const compositionStartHandler = logCompositionEvent('COMP_START');
+        const compositionUpdateHandler = logCompositionEvent('COMP_UPDATE');
+        const compositionEndHandler = logCompositionEvent('COMP_END');
+
+        document.addEventListener('compositionstart', compositionStartHandler, true);
+        document.addEventListener('compositionupdate', compositionUpdateHandler, true);
+        document.addEventListener('compositionend', compositionEndHandler, true);
         document.addEventListener('beforeinput', logBeforeInputEvent, true);
 
         return () => {
-            clearInterval(interval);
             unsubscribe();
-            document.removeEventListener('compositionstart', logCompositionEvent('COMP_START'), true);
-            document.removeEventListener('compositionupdate', logCompositionEvent('COMP_UPDATE'), true);
-            document.removeEventListener('compositionend', logCompositionEvent('COMP_END'), true);
+            document.removeEventListener('compositionstart', compositionStartHandler, true);
+            document.removeEventListener('compositionupdate', compositionUpdateHandler, true);
+            document.removeEventListener('compositionend', compositionEndHandler, true);
             document.removeEventListener('beforeinput', logBeforeInputEvent, true);
         };
     }, [enabled]);
@@ -102,50 +83,39 @@ const IMEDebug: FC<IMEDebugProps> = ({
             <div className="mb-2 font-bold text-yellow-400">🚀 Smart Input Debug</div>
 
             <div className="space-y-1">
-                <div className={`flex justify-between ${inputState.isTyping ? 'text-red-400' : 'text-green-400'}`}>
+                <div className={`flex justify-between ${imeState.isTyping ? 'text-red-400' : 'text-green-400'}`}>
                     <span>输入状态:</span>
-                    <span>{inputState.isTyping ? '正在输入' : '空闲'}</span>
+                    <span>{imeState.isTyping ? '正在输入' : '空闲'}</span>
                 </div>
 
-                <div className={`flex justify-between ${inputState.isComposing ? 'text-red-400' : 'text-gray-400'}`}>
+                <div className={`flex justify-between ${imeState.isComposing ? 'text-red-400' : 'text-gray-400'}`}>
                     <span>组合输入:</span>
-                    <span>{inputState.isComposing ? 'ON' : 'OFF'}</span>
+                    <span>{imeState.isComposing ? 'ON' : 'OFF'}</span>
                 </div>
 
-                <div className={`flex justify-between ${inputState.isDeleting ? 'text-orange-400' : 'text-gray-400'}`}>
+                <div className={`flex justify-between ${imeState.isDeleting ? 'text-orange-400' : 'text-gray-400'}`}>
                     <span>删除中:</span>
-                    <span>{inputState.isDeleting ? 'ON' : 'OFF'}</span>
+                    <span>{imeState.isDeleting ? 'ON' : 'OFF'}</span>
                 </div>
 
                 <div className="flex justify-between text-blue-400">
                     <span>输入间隔:</span>
-                    <span>{Date.now() - inputState.lastInputTime}ms</span>
+                    <span>{Date.now() - imeState.lastInputTime}ms</span>
                 </div>
 
-                <div className={`flex justify-between ${debugInfo.isComposing ? 'text-red-400' : 'text-green-400'}`}>
-                    <span>IME状态:</span>
-                    <span>{debugInfo.isComposing ? '输入中' : '空闲'}</span>
+                <div className="flex justify-between text-purple-400">
+                    <span>最后输入:</span>
+                    <span>{imeState.lastInputType || 'None'}</span>
                 </div>
-                
-                <div className="flex justify-between">
-                    <span>全局状态:</span>
-                    <span className={debugInfo.globalComposingState ? 'text-red-400' : 'text-gray-400'}>
-                        {debugInfo.globalComposingState ? 'ON' : 'OFF'}
-                    </span>
+
+                <div className="flex justify-between text-cyan-400">
+                    <span>快速输入阈值:</span>
+                    <span>{imeState.fastTypingThreshold}ms</span>
                 </div>
-                
-                <div className="flex justify-between">
-                    <span>窗口状态:</span>
-                    <span className={debugInfo.windowComposingState ? 'text-red-400' : 'text-gray-400'}>
-                        {debugInfo.windowComposingState ? 'ON' : 'OFF'}
-                    </span>
-                </div>
-                
-                <div className="flex justify-between">
-                    <span>监听器:</span>
-                    <span className={debugInfo.listenersAdded ? 'text-green-400' : 'text-red-400'}>
-                        {debugInfo.listenersAdded ? '已添加' : '未添加'}
-                    </span>
+
+                <div className={`flex justify-between ${(Date.now() - imeState.lastInputTime) < imeState.fastTypingThreshold ? 'text-yellow-400' : 'text-gray-400'}`}>
+                    <span>快速输入:</span>
+                    <span>{(Date.now() - imeState.lastInputTime) < imeState.fastTypingThreshold ? 'ON' : 'OFF'}</span>
                 </div>
             </div>
 

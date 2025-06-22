@@ -6,8 +6,8 @@
 
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from 'prosemirror-state';
-import { ModernIMEHandler } from 'libs/web/utils/modern-ime-handler';
-import { restoreDOM, getEditableElement } from 'libs/web/utils/restore-dom';
+import { ModernIMEHandler, TipTapEditorInterface } from 'libs/web/utils/modern-ime-handler';
+import { getEditableElement } from 'libs/web/utils/restore-dom';
 
 export interface ModernIMEFixOptions {
     /**
@@ -49,6 +49,67 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                 key: ModernIMEFixPluginKey,
 
                 view: (editorView) => {
+                    // 创建TipTap编辑器接口
+                    const editorInterface: TipTapEditorInterface = {
+                        editor: this.editor,
+
+                        getSelection() {
+                            const { from, to } = editorView.state.selection;
+                            return { from, to };
+                        },
+
+                        insertText(text: string, from?: number, to?: number) {
+                            try {
+                                const { state, dispatch } = editorView;
+                                const insertFrom = from ?? state.selection.from;
+                                const insertTo = to ?? state.selection.to;
+
+                                const tr = state.tr.insertText(text, insertFrom, insertTo);
+                                dispatch(tr);
+                                return true;
+                            } catch (error) {
+                                console.error('🎯 TipTap IME: insertText error', error);
+                                return false;
+                            }
+                        },
+
+                        deleteRange(from: number, to: number) {
+                            try {
+                                const { state, dispatch } = editorView;
+                                const tr = state.tr.delete(from, to);
+                                dispatch(tr);
+                                return true;
+                            } catch (error) {
+                                console.error('🎯 TipTap IME: deleteRange error', error);
+                                return false;
+                            }
+                        },
+
+                        deleteBackward(count: number = 1) {
+                            try {
+                                const { state, dispatch } = editorView;
+                                const { from } = state.selection;
+                                const deleteFrom = Math.max(0, from - count);
+                                const tr = state.tr.delete(deleteFrom, from);
+                                dispatch(tr);
+                                return true;
+                            } catch (error) {
+                                console.error('🎯 TipTap IME: deleteBackward error', error);
+                                return false;
+                            }
+                        },
+
+                        insertBreak() {
+                            try {
+                                // 使用TipTap的命令系统插入换行
+                                return this.editor.commands.setHardBreak() || this.editor.commands.splitBlock();
+                            } catch (error) {
+                                console.error('🎯 TipTap IME: insertBreak error', error);
+                                return false;
+                            }
+                        }
+                    };
+
                     // 创建现代IME处理器
                     let imeHandler: ModernIMEHandler | null = null;
 
@@ -59,6 +120,7 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                             imeHandler = new ModernIMEHandler(editableElement, {
                                 debug: this.options.debug,
                                 forceRestoreDOM: this.options.forceRestoreDOM,
+                                editorInterface,
                                 onChange: (getValue) => {
                                     // 这里可以添加额外的onChange处理
                                     if (this.options.debug) {
@@ -81,100 +143,50 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
 
                 props: {
                     handleDOMEvents: {
-                        // 现代方案主要依赖beforeinput事件，这里只做补充处理
+                        // 现代方案将所有IME处理委托给ModernIMEHandler
+                        // 这里只做最小必要的处理，避免与ModernIMEHandler冲突
+
                         beforeinput: (view, event) => {
+                            // 记录IME相关事件用于调试和状态跟踪
                             const { inputType, data } = event;
 
-
-
-                            // 对于需要特殊处理的inputType，使用RestoreDOM
-                            const needsRestoreDOM = [
-                                'insertCompositionText',
-                                'deleteContentBackward',
-                                'insertText'
-                            ].includes(inputType);
-
-                            // 检查是否需要使用RestoreDOM
-                            const shouldUseRestoreDOM = () => {
-                                if (typeof window === 'undefined') return false;
-                                const userAgent = window.navigator.userAgent;
-                                const isAndroid = /Android/i.test(userAgent);
-                                const isMobile = /Mobile|Tablet/i.test(userAgent);
-                                return this.options.forceRestoreDOM || isAndroid || isMobile;
-                            };
-
-                            if (needsRestoreDOM && shouldUseRestoreDOM()) {
-                                // 尝试阻止默认行为
-                                try {
-                                    event.preventDefault();
-                                } catch (e) {
-                                    // 某些情况下无法阻止，使用RestoreDOM处理
-                                }
-
-                                // 使用RestoreDOM处理
-                                const editableElement = getEditableElement(view.dom);
-                                if (editableElement) {
-                                    // 记录事件
-                                    const tr = view.state.tr.setMeta(ModernIMEFixPluginKey, {
-                                        type: 'restore-dom',
-                                        inputType,
-                                        data
-                                    });
-                                    view.dispatch(tr);
-
-                                    restoreDOM(editableElement, () => {
-                                        // 执行相应的编辑器命令
-                                        const { state, dispatch } = view;
-
-                                        switch (inputType) {
-                                            case 'insertCompositionText':
-                                            case 'insertText':
-                                                if (data) {
-                                                    if (data.includes('\n')) {
-                                                        // 插入换行
-                                                        const tr = state.tr.split(state.selection.from);
-                                                        dispatch(tr);
-                                                    } else {
-                                                        // 插入文本
-                                                        const tr = state.tr.insertText(data, state.selection.from, state.selection.to);
-                                                        dispatch(tr);
-                                                    }
-                                                }
-                                                break;
-                                            case 'deleteContentBackward':
-                                                // 向后删除
-                                                const tr = state.tr.delete(state.selection.from - 1, state.selection.from);
-                                                dispatch(tr);
-                                                break;
-                                        }
-                                    }, {
-                                        debug: false,
-                                        timeout: 50
-                                    });
-                                }
-                                return true; // 阻止ProseMirror的默认处理
+                            if (this.options.debug) {
+                                console.log('🎯 IMEFix Extension: beforeinput', { inputType, data });
                             }
 
-                            return false; // 让ProseMirror正常处理
+                            // 记录事件到插件状态
+                            const tr = view.state.tr.setMeta(ModernIMEFixPluginKey, {
+                                type: 'ime-input',
+                                inputType,
+                                data,
+                                timestamp: Date.now()
+                            });
+                            view.dispatch(tr);
+
+                            // 让ModernIMEHandler处理所有IME逻辑
+                            return false;
                         },
 
                         // 简化的键盘事件处理
                         keydown: (view, event) => {
                             // 现代方案主要依赖beforeinput，keydown只做最小必要的处理
-                            // 对于IME处理，我们主要依赖beforeinput事件
+                            if (this.options.debug && event.key === 'Process') {
+                                console.log('🎯 IMEFix Extension: IME composition key detected');
+                            }
 
                             return false; // 让其他处理器正常工作
                         }
                     }
                 },
 
-                // 状态管理
+                // 状态管理 - 简化版本，主要用于调试和监控
                 state: {
                     init() {
                         return {
                             imeEvents: 0,
                             lastInputType: null,
-                            restoreDOMCount: 0
+                            lastEventTime: 0,
+                            isActive: true
                         };
                     },
 
@@ -187,12 +199,8 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                                     return {
                                         ...value,
                                         imeEvents: value.imeEvents + 1,
-                                        lastInputType: meta.inputType
-                                    };
-                                case 'restore-dom':
-                                    return {
-                                        ...value,
-                                        restoreDOMCount: value.restoreDOMCount + 1
+                                        lastInputType: meta.inputType,
+                                        lastEventTime: meta.timestamp || Date.now()
                                     };
                                 default:
                                     return value;

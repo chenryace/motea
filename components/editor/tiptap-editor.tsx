@@ -111,7 +111,7 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
             // IME 输入法优化扩展
             IMEFix.configure({
                 enabled: true,
-                debug: false,
+                debug: process.env.NODE_ENV === 'development', // 开发环境启用调试
                 forceRestoreDOM: false,
             }),
         ],
