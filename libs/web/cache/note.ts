@@ -3,7 +3,33 @@ import { noteCacheInstance, NoteCacheItem } from 'libs/web/cache';
 import { isNoteLink, NoteModel } from 'libs/shared/note';
 import { keys, pull } from 'lodash';
 import { removeMarkdown } from '../utils/markdown';
-import markdownLinkExtractor from 'markdown-link-extractor';
+
+/**
+ * 🔗 简单的 Markdown 链接提取器
+ * 替换 markdown-link-extractor 以避免依赖冲突
+ */
+function extractMarkdownLinks(content: string): string[] {
+    const links: string[] = [];
+
+    // 匹配 [text](url) 格式的链接
+    const linkRegex = /\[([^\]]*)\]\(([^)]+)\)/g;
+    let match;
+
+    while ((match = linkRegex.exec(content)) !== null) {
+        const url = match[2];
+        if (url && !url.startsWith('#')) { // 排除锚点链接
+            links.push(url);
+        }
+    }
+
+    // 匹配 <url> 格式的自动链接
+    const autoLinkRegex = /<(https?:\/\/[^>]+)>/g;
+    while ((match = autoLinkRegex.exec(content)) !== null) {
+        links.push(match[1]);
+    }
+
+    return links;
+}
 
 /**
  * 清除本地存储中未使用的 note
@@ -23,7 +49,7 @@ async function getItem(id: string) {
 }
 
 async function setItem(id: string, note: NoteModel) {
-    const extractorLinks = markdownLinkExtractor(note.content ?? '', false);
+    const extractorLinks = extractMarkdownLinks(note.content ?? '');
     const linkIds: string[] = [];
     if (Array.isArray(extractorLinks) && extractorLinks.length) {
         extractorLinks.forEach((link) => {
