@@ -21,7 +21,7 @@ export class IMEStateManager {
         isDeleting: false,
         lastInputTime: 0,
         lastInputType: null,
-        fastTypingThreshold: 100
+        fastTypingThreshold: 200
     };
 
     private listeners = new Set<IMEStateListener>();
