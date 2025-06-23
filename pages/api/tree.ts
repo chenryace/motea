@@ -1,6 +1,7 @@
 import { api } from 'libs/server/connect';
 import { useAuth } from 'libs/server/middlewares/auth';
 import { useStore } from 'libs/server/middlewares/store';
+import { readRateLimit } from 'libs/server/middlewares/rate-limit';
 import TreeActions, { TreeModel, ROOT_ID } from 'libs/shared/tree';
 import { StoreProvider } from 'libs/server/store';
 import { getPathNoteById } from 'libs/server/note-path';
@@ -22,18 +23,25 @@ async function enrichTreeWithMetadata(tree: TreeModel, store: StoreProvider): Pr
     const noteIds = Object.keys(tree.items).filter(id => id !== ROOT_ID);
     console.log(`📊 Enriching ${noteIds.length} notes with metadata...`);
 
-    const metadataPromises = noteIds.map(async (noteId) => {
-        try {
-            const { meta, updated_at } = await store.getObjectAndMeta(getPathNoteById(noteId));
-            if (meta) {
-                const jsonMeta = metaToJson(meta);
+    const startTime = performance.now();
+
+    try {
+        // 🚀 使用批量查询优化 - 解决 N+1 查询问题
+        const notePaths = noteIds.map(noteId => getPathNoteById(noteId));
+        const batchResults = await store.batchGetObjectAndMeta(notePaths);
+
+        // 📝 处理批量查询结果
+        const processedResults = noteIds.map((noteId, index) => {
+            const result = batchResults[index];
+            if (result?.meta) {
+                const jsonMeta = metaToJson(result.meta);
 
                 let safeTitle = '';
                 try {
                     safeTitle = jsonMeta.title || '';
                     if (safeTitle.includes('<') && safeTitle.includes('>')) {
                         console.warn(`⚠️ Detected HTML in title for note ${noteId}, using fallback`);
-                        safeTitle = ''; 
+                        safeTitle = '';
                     }
                 } catch (error) {
                     console.warn(`⚠️ Failed to process title for note ${noteId}:`, error);
@@ -44,7 +52,7 @@ async function enrichTreeWithMetadata(tree: TreeModel, store: StoreProvider): Pr
                     id: noteId,
                     metadata: {
                         title: safeTitle,
-                        updated_at: updated_at || jsonMeta.date || new Date().toISOString(),
+                        updated_at: result.updated_at || jsonMeta.date || new Date().toISOString(),
                         deleted: jsonMeta.deleted,
                         pinned: jsonMeta.pinned,
                         shared: jsonMeta.shared,
@@ -53,25 +61,78 @@ async function enrichTreeWithMetadata(tree: TreeModel, store: StoreProvider): Pr
                 };
             }
             return null;
-        } catch (error) {
-            console.warn(`⚠️ Failed to get metadata for note ${noteId}:`, error);
-            return null;
-        }
-    });
+        });
 
-    const metadataResults = await Promise.all(metadataPromises);
+        // 📝 更新树结构中的元数据
+        processedResults.forEach(result => {
+            if (result && enrichedTree.items[result.id]) {
+                enrichedTree.items[result.id].data = result.metadata as any;
+            }
+        });
 
-    metadataResults.forEach(result => {
-        if (result && enrichedTree.items[result.id]) {
-            enrichedTree.items[result.id].data = result.metadata as any;
-        }
-    });
+        const endTime = performance.now();
+        const duration = (endTime - startTime) / 1000;
+        console.log(`✅ Batch metadata enrichment completed in ${duration.toFixed(2)}s (${noteIds.length} notes)`);
 
-    console.log(`✅ Successfully enriched tree with metadata`);
+    } catch (error) {
+        console.warn('⚠️ Batch metadata enrichment failed, falling back to individual queries:', error);
+
+        // 🛡️ 降级到原有的并发查询方式
+        const metadataPromises = noteIds.map(async (noteId) => {
+            try {
+                const { meta, updated_at } = await store.getObjectAndMeta(getPathNoteById(noteId));
+                if (meta) {
+                    const jsonMeta = metaToJson(meta);
+
+                    let safeTitle = '';
+                    try {
+                        safeTitle = jsonMeta.title || '';
+                        if (safeTitle.includes('<') && safeTitle.includes('>')) {
+                            console.warn(`⚠️ Detected HTML in title for note ${noteId}, using fallback`);
+                            safeTitle = '';
+                        }
+                    } catch (error) {
+                        console.warn(`⚠️ Failed to process title for note ${noteId}:`, error);
+                        safeTitle = '';
+                    }
+
+                    return {
+                        id: noteId,
+                        metadata: {
+                            title: safeTitle,
+                            updated_at: updated_at || jsonMeta.date || new Date().toISOString(),
+                            deleted: jsonMeta.deleted,
+                            pinned: jsonMeta.pinned,
+                            shared: jsonMeta.shared,
+                            pid: jsonMeta.pid,
+                        }
+                    };
+                }
+                return null;
+            } catch (error) {
+                console.warn(`⚠️ Failed to get metadata for note ${noteId}:`, error);
+                return null;
+            }
+        });
+
+        const metadataResults = await Promise.all(metadataPromises);
+
+        metadataResults.forEach(result => {
+            if (result && enrichedTree.items[result.id]) {
+                enrichedTree.items[result.id].data = result.metadata as any;
+            }
+        });
+
+        const endTime = performance.now();
+        const duration = (endTime - startTime) / 1000;
+        console.log(`✅ Fallback metadata enrichment completed in ${duration.toFixed(2)}s`);
+    }
+
     return enrichedTree;
 }
 
 export default api()
+    .use(readRateLimit)
     .use(useAuth)
     .use(useStore)
     .get(async (req, res) => {
