@@ -202,7 +202,7 @@ export class ModernIMEHandler {
             this.executeEditorOperation(inputType, data, targetRanges);
         }, {
             debug: this.options.debug,
-            timeout: 200, // 较短的超时时间，因为我们知道会有DOM变化
+            timeout: 500, // 较短的超时时间，因为我们知道会有DOM变化
             restoreTypes: ['childList'], // 只恢复子节点变化，避免影响文本内容
             skipCharacterData: true, // 跳过字符数据变化，保持IME兼容性
             shouldRestore: (mutation) => {
