@@ -50,8 +50,19 @@ const useNoteTree = (initData: TreeModel = DEFAULT_TREE) => {
 
     const fetchNotes = useCallback(
         async (tree: TreeModel) => {
-            const preloadCount = parseInt(process.env.PRELOAD_NOTES_COUNT || '10', 10);
-            console.log(`⚙️ 预加载配置: ${preloadCount} 个笔记`);
+            // 🎯 智能预载配置：根据环境和笔记数量动态调整
+            const basePreloadCount = parseInt(process.env.PRELOAD_NOTES_COUNT || '10', 10);
+            const totalNotes = Object.keys(tree.items).filter(id => id !== ROOT_ID).length;
+
+            // 📊 根据笔记总数智能调整预载数量
+            let preloadCount = basePreloadCount;
+            if (totalNotes <= 20) {
+                preloadCount = Math.min(totalNotes, basePreloadCount); // 笔记少时全部预载
+            } else if (totalNotes > 100) {
+                preloadCount = Math.max(5, Math.min(basePreloadCount, 15)); // 笔记多时限制预载
+            }
+
+            console.log(`⚙️ 智能预加载配置: ${preloadCount}/${totalNotes} 个笔记 (基础配置: ${basePreloadCount})`);
 
             const allNotes = Object.values(tree.items)
                 .filter(item => item.id !== ROOT_ID && item.data)

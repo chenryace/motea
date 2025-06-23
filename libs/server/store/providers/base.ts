@@ -66,6 +66,7 @@ export abstract class StoreProvider {
         meta?: { [key: string]: string };
         contentType?: string;
         buffer?: Buffer;
+        updated_at?: string;
     }>;
 
     /**
@@ -91,4 +92,26 @@ export abstract class StoreProvider {
         toPath: string,
         options: ObjectOptions
     ): Promise<void>;
+
+    /**
+     * 🚀 批量获取对象元数据 - 性能优化
+     * 默认实现：降级到单个查询，子类可以重写以提供更高效的实现
+     */
+    async batchGetObjectMeta(paths: string[]): Promise<Array<{ [key: string]: string } | undefined>> {
+        return Promise.all(paths.map(path => this.getObjectMeta(path)));
+    }
+
+    /**
+     * 🚀 批量获取对象内容和元数据 - 性能优化
+     * 默认实现：降级到单个查询，子类可以重写以提供更高效的实现
+     */
+    async batchGetObjectAndMeta(paths: string[]): Promise<Array<{
+        content?: string;
+        meta?: { [key: string]: string };
+        contentType?: string;
+        buffer?: Buffer;
+        updated_at?: string;
+    }>> {
+        return Promise.all(paths.map(path => this.getObjectAndMeta(path)));
+    }
 }
