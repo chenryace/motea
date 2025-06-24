@@ -21,7 +21,7 @@ export class IMEStateManager {
         isDeleting: false,
         lastInputTime: 0,
         lastInputType: null,
-        fastTypingThreshold: 200
+        fastTypingThreshold: 100
     };
 
     private listeners = new Set<IMEStateListener>();
@@ -31,6 +31,7 @@ export class IMEStateManager {
     // 保存绑定后的事件处理器引用
     private boundHandlers = {
         compositionStart: this.handleCompositionStart.bind(this),
+        compositionUpdate: this.handleCompositionUpdate.bind(this),
         compositionEnd: this.handleCompositionEnd.bind(this),
         beforeInput: this.handleBeforeInput.bind(this),
         keyDown: this.handleKeyDown.bind(this)
@@ -46,6 +47,7 @@ export class IMEStateManager {
 
         // 使用预绑定的事件处理器
         document.addEventListener('compositionstart', this.boundHandlers.compositionStart, true);
+        document.addEventListener('compositionupdate', this.boundHandlers.compositionUpdate, true);
         document.addEventListener('compositionend', this.boundHandlers.compositionEnd, true);
         document.addEventListener('beforeinput', this.boundHandlers.beforeInput, true);
         document.addEventListener('keydown', this.boundHandlers.keyDown, true);
@@ -58,7 +60,18 @@ export class IMEStateManager {
     private handleCompositionStart(event: CompositionEvent) {
         this.updateState({ isComposing: true });
         if (this.debug) {
-            console.log('🎯 IMEStateManager: Composition started');
+            console.log('🎯 IMEStateManager: Composition started', { data: event.data });
+        }
+    }
+
+    private handleCompositionUpdate(event: CompositionEvent) {
+        // 确保在组合输入过程中保持 isComposing 状态
+        this.updateState({
+            isComposing: true,
+            lastInputTime: Date.now()
+        });
+        if (this.debug) {
+            console.log('🎯 IMEStateManager: Composition updating', { data: event.data });
         }
     }
 
@@ -66,7 +79,7 @@ export class IMEStateManager {
         this.updateState({ isComposing: false });
         this.resetTypingTimer();
         if (this.debug) {
-            console.log('🎯 IMEStateManager: Composition ended');
+            console.log('🎯 IMEStateManager: Composition ended', { data: event.data });
         }
     }
 
@@ -204,6 +217,7 @@ export class IMEStateManager {
 
         // 使用预绑定的事件处理器引用正确移除监听器
         document.removeEventListener('compositionstart', this.boundHandlers.compositionStart, true);
+        document.removeEventListener('compositionupdate', this.boundHandlers.compositionUpdate, true);
         document.removeEventListener('compositionend', this.boundHandlers.compositionEnd, true);
         document.removeEventListener('beforeinput', this.boundHandlers.beforeInput, true);
         document.removeEventListener('keydown', this.boundHandlers.keyDown, true);

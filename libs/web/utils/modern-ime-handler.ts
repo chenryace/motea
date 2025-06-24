@@ -83,9 +83,10 @@ export class ModernIMEHandler {
 
     // 保存绑定后的事件处理器引用，确保可以正确移除
     private boundHandlers = {
-        compositionStart: this.handleCompositionStart.bind(this),
-        compositionEnd: this.handleCompositionEnd.bind(this),
-        beforeInput: this.handleBeforeInput.bind(this)
+        compositionStart: this.handleCompositionStart.bind(this) as EventListener,
+        compositionUpdate: this.handleCompositionUpdate.bind(this) as EventListener,
+        compositionEnd: this.handleCompositionEnd.bind(this) as EventListener,
+        beforeInput: this.handleBeforeInput.bind(this) as EventListener
     };
 
     constructor(element: Element, options: ModernIMEHandlerOptions = {}) {
@@ -117,6 +118,7 @@ export class ModernIMEHandler {
 
         // 使用预绑定的事件处理器，确保可以正确移除
         editableElement.addEventListener('compositionstart', this.boundHandlers.compositionStart);
+        editableElement.addEventListener('compositionupdate', this.boundHandlers.compositionUpdate);
         editableElement.addEventListener('compositionend', this.boundHandlers.compositionEnd);
         editableElement.addEventListener('beforeinput', this.boundHandlers.beforeInput);
 
@@ -128,14 +130,22 @@ export class ModernIMEHandler {
     private handleCompositionStart(event: CompositionEvent) {
         this.isComposing = true;
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Composition started', event);
+            console.log('🎯 ModernIMEHandler: Composition started', { data: event.data });
         }
     }
-    
+
+    private handleCompositionUpdate(event: CompositionEvent) {
+        // 确保在组合输入过程中保持 isComposing 状态
+        this.isComposing = true;
+        if (this.options.debug) {
+            console.log('🎯 ModernIMEHandler: Composition updating', { data: event.data });
+        }
+    }
+
     private handleCompositionEnd(event: CompositionEvent) {
         this.isComposing = false;
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Composition ended', event);
+            console.log('🎯 ModernIMEHandler: Composition ended', { data: event.data });
         }
     }
     
@@ -202,7 +212,7 @@ export class ModernIMEHandler {
             this.executeEditorOperation(inputType, data, targetRanges);
         }, {
             debug: this.options.debug,
-            timeout: 500, // 较短的超时时间，因为我们知道会有DOM变化
+            timeout: 50, // 较短的超时时间，因为我们知道会有DOM变化
             restoreTypes: ['childList'], // 只恢复子节点变化，避免影响文本内容
             skipCharacterData: true, // 跳过字符数据变化，保持IME兼容性
             shouldRestore: (mutation) => {
@@ -435,6 +445,7 @@ export class ModernIMEHandler {
         const editableElement = getEditableElement(this.element);
         if (editableElement) {
             editableElement.removeEventListener('compositionstart', this.boundHandlers.compositionStart);
+            editableElement.removeEventListener('compositionupdate', this.boundHandlers.compositionUpdate);
             editableElement.removeEventListener('compositionend', this.boundHandlers.compositionEnd);
             editableElement.removeEventListener('beforeinput', this.boundHandlers.beforeInput);
         }
