@@ -39,6 +39,8 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
         };
     },
 
+
+
     addProseMirrorPlugins() {
         if (!this.options.enabled) {
             return [];
@@ -145,42 +147,93 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                     handleDOMEvents: {
                         // 拦截 composition 事件，防止 ProseMirror 的默认处理干扰 IME
                         compositionstart: (view, event) => {
+                            // 判断是否为真正的 IME 输入
+                            const data = event.data;
+                            let isRealIME = false;
+
+                            if (data) {
+                                // 检查数据内容
+                                const hasChineseChars = /[\u4e00-\u9fff]/.test(data);
+                                const hasPinyin = /^[a-z]+$/.test(data) && data.length > 1;
+
+                                // 如果包含中文字符，肯定是 IME 输入
+                                if (hasChineseChars) {
+                                    isRealIME = true;
+                                }
+                                // 如果是单个英文字符或特殊字符（如 #），很可能是普通输入
+                                else if (/^[a-zA-Z#\s]$/.test(data)) {
+                                    isRealIME = false;
+                                }
+                                // 如果是拼音组合（多个小写字母），可能是 IME 输入
+                                else if (hasPinyin) {
+                                    isRealIME = true;
+                                }
+                            }
+
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: compositionstart intercepted', {
+                                console.log('🎯 IMEFix Extension: compositionstart', {
                                     data: event.data,
                                     target: event.target,
-                                    composing: view.composing
+                                    composing: view.composing,
+                                    isRealIME: isRealIME
                                 });
                             }
 
-                            // 设置 ProseMirror 的组合输入状态，但阻止其默认处理
-                            if (!view.composing) {
-                                view.input.composing = true;
-                                view.input.compositionID++;
+                            // 只有在真正的 IME 输入时才拦截
+                            if (isRealIME) {
+                                if (this.options.debug) {
+                                    console.log('🎯 IMEFix Extension: Blocking compositionstart for real IME input');
+                                }
+
+                                // 阻止 ProseMirror 的默认 compositionstart 处理
+                                return true; // 阻止事件冒泡到 ProseMirror
                             }
 
-                            // 阻止 ProseMirror 的默认 compositionstart 处理
-                            // 防止 endComposition() 被调用和内容被删除
-                            return true; // 阻止事件冒泡到 ProseMirror
+                            // 对于非 IME 输入（如英文输入），让 ProseMirror 正常处理
+                            return false;
                         },
 
                         compositionupdate: (view, event) => {
+                            // 判断是否为真正的 IME 输入
+                            const data = event.data;
+                            let isRealIME = false;
+
+                            if (data) {
+                                // 检查数据内容
+                                const hasChineseChars = /[\u4e00-\u9fff]/.test(data);
+                                const hasPinyin = /^[a-z]+$/.test(data) && data.length > 1;
+
+                                // 如果包含中文字符，肯定是 IME 输入
+                                if (hasChineseChars) {
+                                    isRealIME = true;
+                                }
+                                // 如果是拼音组合（多个小写字母），可能是 IME 输入
+                                else if (hasPinyin) {
+                                    isRealIME = true;
+                                }
+                            }
+
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: compositionupdate intercepted', {
+                                console.log('🎯 IMEFix Extension: compositionupdate', {
                                     data: event.data,
                                     target: event.target,
-                                    composing: view.composing
+                                    composing: view.composing,
+                                    isRealIME: isRealIME
                                 });
                             }
 
-                            // 确保 ProseMirror 知道我们正在组合输入
-                            if (!view.composing) {
-                                view.input.composing = true;
+                            // 只有在真正的 IME 输入时才拦截
+                            if (isRealIME) {
+                                if (this.options.debug) {
+                                    console.log('🎯 IMEFix Extension: Blocking compositionupdate for real IME input');
+                                }
+
+                                // 阻止 ProseMirror 的默认 compositionupdate 处理
+                                return true; // 阻止事件冒泡到 ProseMirror
                             }
 
-                            // 阻止 ProseMirror 的默认 compositionupdate 处理
-                            // 这是防止快速输入被打断的关键
-                            return true; // 阻止事件冒泡到 ProseMirror
+                            // 对于非 IME 输入，让 ProseMirror 正常处理
+                            return false;
                         },
 
                         compositionend: (view, event) => {
@@ -209,21 +262,8 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                                 });
                             }
 
-                            // 如果是组合输入相关的事件，在 IME 输入期间暂停 DOM 观察器
-                            if (view.composing && (inputType === 'insertCompositionText' || inputType === 'insertText')) {
-                                // 暂时禁用 DOM 观察器的自动刷新
-                                const originalFlush = view.domObserver.flush;
-                                view.domObserver.flush = () => {
-                                    if (this.options.debug) {
-                                        console.log('🎯 IMEFix Extension: DOM observer flush blocked during composition');
-                                    }
-                                };
-
-                                // 在短时间后恢复
-                                setTimeout(() => {
-                                    view.domObserver.flush = originalFlush;
-                                }, 50);
-                            }
+                            // 在 IME 输入期间，我们依赖 ModernIMEHandler 来处理
+                            // 这里不需要额外的 DOM 观察器操作
 
                             // 记录事件到插件状态
                             const tr = view.state.tr.setMeta(ModernIMEFixPluginKey, {
