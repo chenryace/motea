@@ -146,17 +146,36 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                         // 拦截 composition 事件，防止 ProseMirror 的默认处理干扰 IME
                         compositionstart: (view, event) => {
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: compositionstart intercepted', { data: event.data });
+                                console.log('🎯 IMEFix Extension: compositionstart intercepted', {
+                                    data: event.data,
+                                    target: event.target,
+                                    composing: view.composing
+                                });
+                            }
+
+                            // 设置 ProseMirror 的组合输入状态，但阻止其默认处理
+                            if (!view.composing) {
+                                view.input.composing = true;
+                                view.input.compositionID++;
                             }
 
                             // 阻止 ProseMirror 的默认 compositionstart 处理
-                            // 这样可以防止过早的 endComposition() 调用
+                            // 防止 endComposition() 被调用和内容被删除
                             return true; // 阻止事件冒泡到 ProseMirror
                         },
 
                         compositionupdate: (view, event) => {
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: compositionupdate intercepted', { data: event.data });
+                                console.log('🎯 IMEFix Extension: compositionupdate intercepted', {
+                                    data: event.data,
+                                    target: event.target,
+                                    composing: view.composing
+                                });
+                            }
+
+                            // 确保 ProseMirror 知道我们正在组合输入
+                            if (!view.composing) {
+                                view.input.composing = true;
                             }
 
                             // 阻止 ProseMirror 的默认 compositionupdate 处理
@@ -166,7 +185,11 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
 
                         compositionend: (view, event) => {
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: compositionend intercepted', { data: event.data });
+                                console.log('🎯 IMEFix Extension: compositionend intercepted', {
+                                    data: event.data,
+                                    target: event.target,
+                                    composing: view.composing
+                                });
                             }
 
                             // 让 compositionend 正常处理，但添加调试信息
@@ -178,7 +201,28 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                             const { inputType, data } = event;
 
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: beforeinput', { inputType, data });
+                                console.log('🎯 IMEFix Extension: beforeinput', {
+                                    inputType,
+                                    data,
+                                    composing: view.composing,
+                                    isCompositionRelated: inputType === 'insertCompositionText' || inputType === 'insertText'
+                                });
+                            }
+
+                            // 如果是组合输入相关的事件，在 IME 输入期间暂停 DOM 观察器
+                            if (view.composing && (inputType === 'insertCompositionText' || inputType === 'insertText')) {
+                                // 暂时禁用 DOM 观察器的自动刷新
+                                const originalFlush = view.domObserver.flush;
+                                view.domObserver.flush = () => {
+                                    if (this.options.debug) {
+                                        console.log('🎯 IMEFix Extension: DOM observer flush blocked during composition');
+                                    }
+                                };
+
+                                // 在短时间后恢复
+                                setTimeout(() => {
+                                    view.domObserver.flush = originalFlush;
+                                }, 50);
                             }
 
                             // 记录事件到插件状态
