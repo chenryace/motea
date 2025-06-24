@@ -83,7 +83,7 @@ const TiptapMainEditor: FC<
                 {...props}
             />
             {!isPreview && <Backlinks />}
-            {/* IME调试组件 - 仅在开发环境显示 */}
+            {/* IME调试组件 - 强制启用以解决生产环境IME问题 */}
             <IMEDebug enabled={true} />
         </article>
     );
