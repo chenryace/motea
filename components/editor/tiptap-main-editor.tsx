@@ -84,7 +84,7 @@ const TiptapMainEditor: FC<
             />
             {!isPreview && <Backlinks />}
             {/* IME调试组件 - 仅在开发环境显示 */}
-            <IMEDebug />
+            <IMEDebug enabled={true} />
         </article>
     );
 };
