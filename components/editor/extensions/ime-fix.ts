@@ -143,35 +143,8 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
 
                 props: {
                     handleDOMEvents: {
-                        // 拦截 composition 事件，防止 ProseMirror 的默认处理干扰 IME
-                        compositionstart: (view, event) => {
-                            if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: compositionstart intercepted', { data: event.data });
-                            }
-
-                            // 阻止 ProseMirror 的默认 compositionstart 处理
-                            // 这样可以防止过早的 endComposition() 调用
-                            return true; // 阻止事件冒泡到 ProseMirror
-                        },
-
-                        compositionupdate: (view, event) => {
-                            if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: compositionupdate intercepted', { data: event.data });
-                            }
-
-                            // 阻止 ProseMirror 的默认 compositionupdate 处理
-                            // 这是防止快速输入被打断的关键
-                            return true; // 阻止事件冒泡到 ProseMirror
-                        },
-
-                        compositionend: (view, event) => {
-                            if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: compositionend intercepted', { data: event.data });
-                            }
-
-                            // 让 compositionend 正常处理，但添加调试信息
-                            return false; // 允许 ProseMirror 处理 compositionend
-                        },
+                        // 现代方案将所有IME处理委托给ModernIMEHandler
+                        // 这里只做最小必要的处理，避免与ModernIMEHandler冲突
 
                         beforeinput: (view, event) => {
                             // 记录IME相关事件用于调试和状态跟踪

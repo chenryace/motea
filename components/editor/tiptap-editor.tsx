@@ -36,7 +36,6 @@ import suggestion from './extensions/slash-suggestion';
 import IMEFix from './extensions/ime-fix';
 import Indent from './extensions/indent';
 import FloatingToolbar from './floating-toolbar';
-import { getGlobalIMEStateManager } from 'libs/web/utils/ime-state-manager';
 
 export interface TiptapEditorProps {
     readOnly?: boolean;
@@ -137,15 +136,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
             if (onChange) {
                 // 只在文档真正变化时才处理
                 if (!transaction.docChanged) {
-                    return;
-                }
-
-                // 检查是否正在进行 IME 输入
-                const imeStateManager = getGlobalIMEStateManager();
-                if (imeStateManager.shouldPauseExpensiveOperations()) {
-                    if (process.env.NODE_ENV === 'development') {
-                        console.log('🎯 TipTap Editor: Pausing onUpdate during IME input');
-                    }
                     return;
                 }
 
