@@ -9,12 +9,18 @@ export interface IMEState {
     isDeleting: boolean;
     lastInputTime: number;
     lastInputType: string | null;
-    fastTypingThreshold: number;
 }
 
 export type IMEStateListener = (state: IMEState) => void;
 
 export class IMEStateManager {
+    private state: IMEState = {
+        isComposing: false,
+        isTyping: false,
+        isDeleting: false,
+        lastInputTime: 0,
+        lastInputType: null,
+    };
 
     private listeners = new Set<IMEStateListener>();
     private typingTimer: NodeJS.Timeout | null = null;
@@ -178,18 +184,10 @@ export class IMEStateManager {
     }
 
     /**
-     * 检查是否正在快速输入
-     */
-    isFastTyping(): boolean {
-        return this.state.isTyping && 
-               (Date.now() - this.state.lastInputTime) < this.state.fastTypingThreshold;
-    }
-
-    /**
      * 检查是否应该暂停昂贵操作
      */
     shouldPauseExpensiveOperations(): boolean {
-        return this.state.isComposing || this.isFastTyping();
+        return this.state.isComposing;
     }
 
     /**

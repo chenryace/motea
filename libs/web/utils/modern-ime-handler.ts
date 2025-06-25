@@ -25,6 +25,11 @@ export interface TipTapEditorInterface {
     editor: any;
 
     /**
+     * ProseMirror EditorView实例
+     */
+    view?: any;
+
+    /**
      * 获取当前选区
      */
     getSelection(): { from: number; to: number };
@@ -48,6 +53,11 @@ export interface TipTapEditorInterface {
      * 插入换行
      */
     insertBreak(): boolean;
+
+    /**
+     * 设置composition状态
+     */
+    setCompositionState?(isComposing: boolean): void;
 }
 
 export interface ModernIMEHandlerOptions {
@@ -116,36 +126,64 @@ export class ModernIMEHandler {
             return;
         }
 
-        // 使用预绑定的事件处理器，确保可以正确移除
-        editableElement.addEventListener('compositionstart', this.boundHandlers.compositionStart);
-        editableElement.addEventListener('compositionupdate', this.boundHandlers.compositionUpdate);
-        editableElement.addEventListener('compositionend', this.boundHandlers.compositionEnd);
+        // 🔥 使用capture=true确保ModernIMEHandler优先处理composition事件
+        editableElement.addEventListener('compositionstart', this.boundHandlers.compositionStart, true);
+        editableElement.addEventListener('compositionupdate', this.boundHandlers.compositionUpdate, true);
+        editableElement.addEventListener('compositionend', this.boundHandlers.compositionEnd, true);
+
+        // beforeinput事件保持bubble阶段处理
         editableElement.addEventListener('beforeinput', this.boundHandlers.beforeInput);
 
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Event listeners bound to', editableElement);
+            console.log('🎯 ModernIMEHandler: Event listeners bound to', editableElement, 'with capture=true for composition events');
         }
     }
     
     private handleCompositionStart(event: CompositionEvent) {
         this.isComposing = true;
+
+        // 🔥 优先处理composition事件，阻止ProseMirror自己的处理
+        event.stopImmediatePropagation();
+
+        // 同步状态到ProseMirror
+        this.syncCompositionStateToProseMirror(true);
+
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Composition started', { data: event.data });
+            console.log('🎯 ModernIMEHandler: Composition started, blocked ProseMirror', { data: event.data });
         }
     }
 
     private handleCompositionUpdate(event: CompositionEvent) {
         // 确保在组合输入过程中保持 isComposing 状态
         this.isComposing = true;
+
+        // 阻止ProseMirror处理compositionupdate
+        event.stopImmediatePropagation();
+
+        // 保持ProseMirror的composition状态
+        this.syncCompositionStateToProseMirror(true);
+
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Composition updating', { data: event.data });
+            console.log('🎯 ModernIMEHandler: Composition updating, maintaining state', { data: event.data });
         }
     }
 
     private handleCompositionEnd(event: CompositionEvent) {
         this.isComposing = false;
+
+        // 阻止ProseMirror自己的compositionend处理
+        event.stopImmediatePropagation();
+
+        // 先处理最终文本插入
+        if (event.data) {
+            this.insertFinalCompositionText(event.data);
+        }
+
+        // 然后同步状态到ProseMirror
+        this.syncCompositionStateToProseMirror(false);
+
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Composition ended', { data: event.data });
+            console.log('🎯 ModernIMEHandler: Composition ended, synced to ProseMirror', { data: event.data });
         }
     }
     
@@ -315,7 +353,57 @@ export class ModernIMEHandler {
             this.deleteBackward();
         }
     }
-    
+
+    /**
+     * 同步composition状态到ProseMirror
+     */
+    private syncCompositionStateToProseMirror(isComposing: boolean) {
+        // 方法1：通过editorInterface设置
+        if (this.options.editorInterface?.setCompositionState) {
+            this.options.editorInterface.setCompositionState(isComposing);
+        }
+
+        // 方法2：直接设置view.composing
+        if (this.options.editorInterface?.view) {
+            this.options.editorInterface.view.composing = isComposing;
+        }
+
+        // 方法3：同步到全局IME状态管理器
+        try {
+            const { getGlobalIMEStateManager } = require('./ime-state-manager');
+            const globalManager = getGlobalIMEStateManager();
+            globalManager.setState({ isComposing });
+        } catch (error) {
+            if (this.options.debug) {
+                console.warn('🎯 ModernIMEHandler: Failed to sync to global IME manager', error);
+            }
+        }
+
+        if (this.options.debug) {
+            console.log('🎯 ModernIMEHandler: Synced composition state to ProseMirror', { isComposing });
+        }
+    }
+
+    /**
+     * 插入最终的composition文本
+     */
+    private insertFinalCompositionText(text: string) {
+        if (!text) return;
+
+        if (this.options.debug) {
+            console.log('🎯 ModernIMEHandler: Inserting final composition text', text);
+        }
+
+        // 检查是否包含换行符
+        if (text.includes('\n')) {
+            // 处理换行
+            this.insertBreak();
+        } else {
+            // 插入文本
+            this.insertText(text);
+        }
+    }
+
     // TipTap编辑器命令集成
     private insertText(text: string) {
         if (!this.options.editorInterface) {

@@ -14,7 +14,6 @@ export interface InputState {
     isDeleting: boolean;
     lastInputTime: number;
     inputBuffer: string[];
-    fastTypingThreshold: number; // 快速输入阈值（ms）
 }
 
 export class InputStateTracker {
@@ -24,7 +23,6 @@ export class InputStateTracker {
         isDeleting: false,
         lastInputTime: 0,
         inputBuffer: [],
-        fastTypingThreshold: 100 // 100ms内的连续输入视为快速输入
     };
 
     private listeners: Array<(state: InputState) => void> = [];
