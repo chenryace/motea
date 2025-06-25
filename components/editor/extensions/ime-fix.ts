@@ -52,6 +52,7 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                     // 创建TipTap编辑器接口
                     const editorInterface: TipTapEditorInterface = {
                         editor: this.editor,
+                        view: editorView,
 
                         getSelection() {
                             const { from, to } = editorView.state.selection;
@@ -107,29 +108,34 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                                 console.error('🎯 TipTap IME: insertBreak error', error);
                                 return false;
                             }
+                        },
+
+                        setCompositionState(isComposing: boolean) {
+                            editorView.composing = isComposing;
+                            if (this.options.debug) {
+                                console.log('🎯 TipTap IME: Set view.composing =', isComposing);
+                            }
                         }
                     };
 
                     // 创建现代IME处理器
                     let imeHandler: ModernIMEHandler | null = null;
 
-                    // 等待DOM准备好后初始化
-                    setTimeout(() => {
-                        const editableElement = getEditableElement(editorView.dom);
-                        if (editableElement) {
-                            imeHandler = new ModernIMEHandler(editableElement, {
-                                debug: this.options.debug,
-                                forceRestoreDOM: this.options.forceRestoreDOM,
-                                editorInterface,
-                                onChange: (getValue) => {
-                                    // 这里可以添加额外的onChange处理
-                                    if (this.options.debug) {
-                                        console.log('🎯 Modern IME: Content changed via IME');
-                                    }
+                    // 直接初始化，不延迟，确保事件监听器优先级
+                    const editableElement = getEditableElement(editorView.dom);
+                    if (editableElement) {
+                        imeHandler = new ModernIMEHandler(editableElement, {
+                            debug: this.options.debug,
+                            forceRestoreDOM: this.options.forceRestoreDOM,
+                            editorInterface,
+                            onChange: (getValue) => {
+                                // 这里可以添加额外的onChange处理
+                                if (this.options.debug) {
+                                    console.log('🎯 Modern IME: Content changed via IME');
                                 }
-                            });
-                        }
-                    }, 0);
+                            }
+                        });
+                    }
 
                     return {
                         destroy() {
