@@ -96,19 +96,27 @@ export const IMEFix = Extension.create<IMEFixOptions>({
                         },
 
                         compositionend: (view, event) => {
-                            // 结束composition，清理状态
-                            stateManager.updateCompositionState(false, event.data, {
-                                forceUpdate: true // 确保状态被正确清理
-                            });
-
                             if (this.options.debug) {
-                                const state = stateManager.getState();
-                                console.log('🎯 IMEFix: Composition ended', {
-                                    data: event.data,
-                                    anomalyCount: state.anomalyCount,
-                                    environment: state.environment
-                                });
+                                console.log('🎯 IMEFix: Composition ending (immediate)', { data: event.data });
                             }
+
+                            // 关键：延迟清除composition状态
+                            // 这样InputRules在compositionend的setTimeout中执行时，
+                            // 仍然能检查到IME状态，从而避免竞态冲突
+                            setTimeout(() => {
+                                stateManager.updateCompositionState(false, event.data, {
+                                    forceUpdate: true // 确保状态被正确清理
+                                });
+
+                                if (this.options.debug) {
+                                    const state = stateManager.getState();
+                                    console.log('🎯 IMEFix: Composition ended (delayed)', {
+                                        data: event.data,
+                                        anomalyCount: state.anomalyCount,
+                                        environment: state.environment
+                                    });
+                                }
+                            }, 50); // 延迟50ms，确保在InputRules的setTimeout之后执行
 
                             return false;
                         }

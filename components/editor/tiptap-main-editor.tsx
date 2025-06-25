@@ -84,7 +84,7 @@ const TiptapMainEditor: FC<
             />
             {!isPreview && <Backlinks />}
             {/* IME调试组件 - 强制启用以解决生产环境IME问题 */}
-            <IMEDebug enabled={false} />
+            <IMEDebug enabled={true} />
         </article>
     );
 };

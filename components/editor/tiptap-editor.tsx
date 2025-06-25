@@ -34,6 +34,7 @@ import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
 import IMEFix from './extensions/ime-fix';
+import SmartInputRules from './extensions/smart-input-rules';
 import Indent from './extensions/indent';
 import FloatingToolbar from './floating-toolbar';
 
@@ -113,7 +114,11 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
             IMEFix.configure({
                 enabled: true,
                 debug: process.env.NODE_ENV === 'development', // 开发环境启用调试
-                forceRestoreDOM: false,
+            }),
+            // 智能InputRules扩展 - 解决与IME的竞态冲突
+            SmartInputRules.configure({
+                enabled: true,
+                debug: process.env.NODE_ENV === 'development',
             }),
             // 缩进扩展
             Indent.configure({
