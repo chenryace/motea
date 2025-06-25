@@ -177,10 +177,6 @@ export class ModernIMEHandler {
     }
 
     private handleCompositionEnd(event: CompositionEvent) {
-        // 阻止ProseMirror自己的compositionend处理
-        event.stopImmediatePropagation();
-        event.preventDefault();
-
         if (this.options.debug) {
             console.log('🎯 ModernIMEHandler: Composition ending', {
                 data: event.data,
@@ -188,19 +184,31 @@ export class ModernIMEHandler {
             });
         }
 
-        // 先处理最终文本插入
-        if (event.data && this.isComposing) {
-            this.insertFinalCompositionText(event.data);
+        // 🔥 关键修复：只有在真正composing状态下才处理
+        if (!this.isComposing) {
+            if (this.options.debug) {
+                console.log('🎯 ModernIMEHandler: Not in composing state, ignoring compositionend');
+            }
+            return;
         }
 
-        // 然后更新状态
+        // 阻止ProseMirror自己的compositionend处理
+        event.stopImmediatePropagation();
+        event.preventDefault();
+
+        // 先更新状态，防止重复处理
         this.isComposing = false;
+
+        // 然后处理最终文本插入
+        if (event.data) {
+            this.insertFinalCompositionText(event.data);
+        }
 
         // 最后同步状态到ProseMirror
         this.syncCompositionStateToProseMirror(false);
 
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Composition ended, synced to ProseMirror', {
+            console.log('🎯 ModernIMEHandler: Composition ended successfully', {
                 data: event.data,
                 finalText: event.data
             });
