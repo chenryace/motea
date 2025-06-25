@@ -1,17 +1,21 @@
 /**
- * Tiptap 扩展：现代IME处理
- * 基于BeforeInput + RestoreDOM的现代方案
- * 不依赖延时策略，使用事件驱动处理IME输入
+ * TipTap IME扩展 - 简化版本
+ * 基于ProseMirror最佳实践，采用最小干预原则
+ *
+ * 设计理念：
+ * 1. 信任ProseMirror - 让ProseMirror处理大部分IME逻辑
+ * 2. 状态同步 - 只同步必要的composition状态到全局状态管理器
+ * 3. 避免冲突 - 不阻止或修改ProseMirror的内置IME处理
+ * 4. 简单可靠 - 移除复杂的RestoreDOM和事件拦截机制
  */
 
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from 'prosemirror-state';
-import { ModernIMEHandler, TipTapEditorInterface } from 'libs/web/utils/modern-ime-handler';
-import { getEditableElement } from 'libs/web/utils/restore-dom';
+import { getGlobalIMEStateManager } from 'libs/web/utils/ime-state-manager';
 
-export interface ModernIMEFixOptions {
+export interface IMEFixOptions {
     /**
-     * 是否启用现代IME处理
+     * 是否启用IME状态同步
      */
     enabled: boolean;
 
@@ -19,29 +23,23 @@ export interface ModernIMEFixOptions {
      * 调试模式
      */
     debug: boolean;
-
-    /**
-     * 是否强制使用RestoreDOM（即使不是移动设备）
-     */
-    forceRestoreDOM: boolean;
 }
 
-interface IMEFixPluginState {
+interface IMEPluginState {
     isComposing: boolean;
-    lastEvent: string | null;
+    lastCompositionData: string | null;
     timestamp: number;
 }
 
-const ModernIMEFixPluginKey = new PluginKey<IMEFixPluginState>('modern-ime-fix');
+const IMEFixPluginKey = new PluginKey<IMEPluginState>('ime-fix');
 
-export const IMEFix = Extension.create<ModernIMEFixOptions>({
-    name: 'modern-ime-fix',
+export const IMEFix = Extension.create<IMEFixOptions>({
+    name: 'ime-fix',
 
     addOptions() {
         return {
             enabled: true,
             debug: false,
-            forceRestoreDOM: false,
         };
     },
 
@@ -50,155 +48,60 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
             return [];
         }
 
+        const stateManager = getGlobalIMEStateManager();
+
         return [
             new Plugin({
-                key: ModernIMEFixPluginKey,
-
-                view: (editorView) => {
-                    // 创建TipTap编辑器接口
-                    const editorInterface: TipTapEditorInterface = {
-                        editor: this.editor,
-                        view: editorView,
-
-                        getSelection() {
-                            const { from, to } = editorView.state.selection;
-                            return { from, to };
-                        },
-
-                        insertText(text: string, from?: number, to?: number) {
-                            try {
-                                const { state, dispatch } = editorView;
-                                const insertFrom = from ?? state.selection.from;
-                                const insertTo = to ?? state.selection.to;
-
-                                const tr = state.tr.insertText(text, insertFrom, insertTo);
-                                dispatch(tr);
-                                return true;
-                            } catch (error) {
-                                console.error('🎯 TipTap IME: insertText error', error);
-                                return false;
-                            }
-                        },
-
-                        deleteRange(from: number, to: number) {
-                            try {
-                                const { state, dispatch } = editorView;
-                                const tr = state.tr.delete(from, to);
-                                dispatch(tr);
-                                return true;
-                            } catch (error) {
-                                console.error('🎯 TipTap IME: deleteRange error', error);
-                                return false;
-                            }
-                        },
-
-                        deleteBackward(count: number = 1) {
-                            try {
-                                const { state, dispatch } = editorView;
-                                const { from } = state.selection;
-                                const deleteFrom = Math.max(0, from - count);
-                                const tr = state.tr.delete(deleteFrom, from);
-                                dispatch(tr);
-                                return true;
-                            } catch (error) {
-                                console.error('🎯 TipTap IME: deleteBackward error', error);
-                                return false;
-                            }
-                        },
-
-                        insertBreak() {
-                            try {
-                                // 使用TipTap的命令系统插入换行
-                                return this.editor.commands.setHardBreak() || this.editor.commands.splitBlock();
-                            } catch (error) {
-                                console.error('🎯 TipTap IME: insertBreak error', error);
-                                return false;
-                            }
-                        },
-
-                        setCompositionState(isComposing: boolean) {
-                            // 使用类型断言来设置只读属性
-                            (editorView as any).composing = isComposing;
-                        }
-                    };
-
-                    // 创建现代IME处理器
-                    let imeHandler: ModernIMEHandler | null = null;
-
-                    // 直接初始化，不延迟，确保事件监听器优先级
-                    const editableElement = getEditableElement(editorView.dom);
-                    if (editableElement) {
-                        imeHandler = new ModernIMEHandler(editableElement, {
-                            debug: this.options.debug,
-                            forceRestoreDOM: this.options.forceRestoreDOM,
-                            editorInterface,
-                            onChange: () => {
-                                // 这里可以添加额外的onChange处理
-                                if (this.options.debug) {
-                                    console.log('🎯 Modern IME: Content changed via IME');
-                                }
-                            }
-                        });
-                    }
-
-                    return {
-                        destroy() {
-                            if (imeHandler) {
-                                imeHandler.destroy();
-                                imeHandler = null;
-                            }
-                        }
-                    };
-                },
+                key: IMEFixPluginKey,
 
                 props: {
                     handleDOMEvents: {
-                        // 简化处理：只记录事件，让ModernIMEHandler完全控制
-                        beforeinput: (view, event) => {
-                            const { inputType, data } = event;
+                        // 监听composition事件，同步状态到全局状态管理器
+                        compositionstart: (view, event) => {
+                            stateManager.updateCompositionState(true, event.data);
 
-                            // 记录事件到插件状态
-                            const tr = view.state.tr.setMeta(ModernIMEFixPluginKey, {
-                                type: 'ime-input',
-                                inputType,
-                                data,
-                                timestamp: Date.now()
-                            });
-                            view.dispatch(tr);
+                            if (this.options.debug) {
+                                console.log('🎯 IMEFix: Composition started', { data: event.data });
+                            }
+
+                            // 不阻止事件，让ProseMirror正常处理
+                            return false;
+                        },
+
+                        compositionupdate: (view, event) => {
+                            stateManager.updateCompositionState(true, event.data);
+
+                            if (this.options.debug) {
+                                console.log('🎯 IMEFix: Composition updating', { data: event.data });
+                            }
+
+                            return false;
+                        },
+
+                        compositionend: (view, event) => {
+                            stateManager.updateCompositionState(false, event.data);
+
+                            if (this.options.debug) {
+                                console.log('🎯 IMEFix: Composition ended', { data: event.data });
+                            }
 
                             return false;
                         }
                     }
                 },
 
-                // 状态管理 - 简化版本，主要用于调试和监控
+                // 简化的状态管理，主要用于调试
                 state: {
                     init() {
                         return {
-                            imeEvents: 0,
-                            lastInputType: null,
-                            lastEventTime: 0,
-                            isActive: true
+                            isComposing: false,
+                            lastCompositionData: null,
+                            timestamp: 0
                         };
                     },
 
                     apply(tr, value) {
-                        const meta = tr.getMeta(ModernIMEFixPluginKey);
-
-                        if (meta) {
-                            switch (meta.type) {
-                                case 'ime-input':
-                                    return {
-                                        ...value,
-                                        imeEvents: value.imeEvents + 1,
-                                        lastInputType: meta.inputType,
-                                        lastEventTime: meta.timestamp || Date.now()
-                                    };
-                                default:
-                                    return value;
-                            }
-                        }
-
+                        // 简单地跟踪状态，不做复杂处理
                         return value;
                     }
                 }
