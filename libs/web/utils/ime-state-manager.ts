@@ -15,14 +15,6 @@ export interface IMEState {
 export type IMEStateListener = (state: IMEState) => void;
 
 export class IMEStateManager {
-    private state: IMEState = {
-        isComposing: false,
-        isTyping: false,
-        isDeleting: false,
-        lastInputTime: 0,
-        lastInputType: null,
-        fastTypingThreshold: 100
-    };
 
     private listeners = new Set<IMEStateListener>();
     private typingTimer: NodeJS.Timeout | null = null;
