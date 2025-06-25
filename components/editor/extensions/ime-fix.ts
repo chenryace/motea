@@ -26,7 +26,13 @@ export interface ModernIMEFixOptions {
     forceRestoreDOM: boolean;
 }
 
-const ModernIMEFixPluginKey = new PluginKey('modern-ime-fix');
+interface IMEFixPluginState {
+    isComposing: boolean;
+    lastEvent: string | null;
+    timestamp: number;
+}
+
+const ModernIMEFixPluginKey = new PluginKey<IMEFixPluginState>('modern-ime-fix');
 
 export const IMEFix = Extension.create<ModernIMEFixOptions>({
     name: 'modern-ime-fix',
@@ -111,10 +117,8 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                         },
 
                         setCompositionState(isComposing: boolean) {
-                            editorView.composing = isComposing;
-                            if (this.options.debug) {
-                                console.log('🎯 TipTap IME: Set view.composing =', isComposing);
-                            }
+                            // 使用类型断言来设置只读属性
+                            (editorView as any).composing = isComposing;
                         }
                     };
 
@@ -128,7 +132,7 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                             debug: this.options.debug,
                             forceRestoreDOM: this.options.forceRestoreDOM,
                             editorInterface,
-                            onChange: (getValue) => {
+                            onChange: () => {
                                 // 这里可以添加额外的onChange处理
                                 if (this.options.debug) {
                                     console.log('🎯 Modern IME: Content changed via IME');
@@ -149,46 +153,9 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
 
                 props: {
                     handleDOMEvents: {
-                        // 🔥 关键：阻止TipTap的composition处理，完全交给ModernIMEHandler
-
-                        compositionstart: (view, event) => {
-                            if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: Blocking compositionstart for ModernIMEHandler');
-                            }
-                            // 阻止TipTap/ProseMirror的默认composition处理
-                            return true;
-                        },
-
-                        compositionupdate: (view, event) => {
-                            if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: Blocking compositionupdate for ModernIMEHandler');
-                            }
-                            // 阻止TipTap/ProseMirror的默认composition处理
-                            return true;
-                        },
-
-                        compositionend: (view, event) => {
-                            if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: Blocking compositionend for ModernIMEHandler');
-                            }
-                            // 🔥 关键：阻止TipTap的InputRule在compositionend后触发
-                            return true;
-                        },
-
+                        // 简化处理：只记录事件，让ModernIMEHandler完全控制
                         beforeinput: (view, event) => {
                             const { inputType, data } = event;
-
-                            if (this.options.debug) {
-                                console.log('🎯 IMEFix Extension: beforeinput', { inputType, data });
-                            }
-
-                            // 🔥 如果是composition相关的输入，完全阻止TipTap处理
-                            if (inputType === 'insertCompositionText') {
-                                if (this.options.debug) {
-                                    console.log('🎯 IMEFix Extension: Blocking insertCompositionText for ModernIMEHandler');
-                                }
-                                return true;
-                            }
 
                             // 记录事件到插件状态
                             const tr = view.state.tr.setMeta(ModernIMEFixPluginKey, {
@@ -199,14 +166,6 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                             });
                             view.dispatch(tr);
 
-                            // 其他输入类型让TipTap正常处理
-                            return false;
-                        },
-
-                        keydown: (view, event) => {
-                            if (this.options.debug && event.key === 'Process') {
-                                console.log('🎯 IMEFix Extension: IME composition key detected');
-                            }
                             return false;
                         }
                     }
