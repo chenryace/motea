@@ -149,15 +149,45 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
 
                 props: {
                     handleDOMEvents: {
-                        // 现代方案将所有IME处理委托给ModernIMEHandler
-                        // 这里只做最小必要的处理，避免与ModernIMEHandler冲突
+                        // 🔥 关键：阻止TipTap的composition处理，完全交给ModernIMEHandler
+
+                        compositionstart: (view, event) => {
+                            if (this.options.debug) {
+                                console.log('🎯 IMEFix Extension: Blocking compositionstart for ModernIMEHandler');
+                            }
+                            // 阻止TipTap/ProseMirror的默认composition处理
+                            return true;
+                        },
+
+                        compositionupdate: (view, event) => {
+                            if (this.options.debug) {
+                                console.log('🎯 IMEFix Extension: Blocking compositionupdate for ModernIMEHandler');
+                            }
+                            // 阻止TipTap/ProseMirror的默认composition处理
+                            return true;
+                        },
+
+                        compositionend: (view, event) => {
+                            if (this.options.debug) {
+                                console.log('🎯 IMEFix Extension: Blocking compositionend for ModernIMEHandler');
+                            }
+                            // 🔥 关键：阻止TipTap的InputRule在compositionend后触发
+                            return true;
+                        },
 
                         beforeinput: (view, event) => {
-                            // 记录IME相关事件用于调试和状态跟踪
                             const { inputType, data } = event;
 
                             if (this.options.debug) {
                                 console.log('🎯 IMEFix Extension: beforeinput', { inputType, data });
+                            }
+
+                            // 🔥 如果是composition相关的输入，完全阻止TipTap处理
+                            if (inputType === 'insertCompositionText') {
+                                if (this.options.debug) {
+                                    console.log('🎯 IMEFix Extension: Blocking insertCompositionText for ModernIMEHandler');
+                                }
+                                return true;
                             }
 
                             // 记录事件到插件状态
@@ -169,18 +199,15 @@ export const IMEFix = Extension.create<ModernIMEFixOptions>({
                             });
                             view.dispatch(tr);
 
-                            // 让ModernIMEHandler处理所有IME逻辑
+                            // 其他输入类型让TipTap正常处理
                             return false;
                         },
 
-                        // 简化的键盘事件处理
                         keydown: (view, event) => {
-                            // 现代方案主要依赖beforeinput，keydown只做最小必要的处理
                             if (this.options.debug && event.key === 'Process') {
                                 console.log('🎯 IMEFix Extension: IME composition key detected');
                             }
-
-                            return false; // 让其他处理器正常工作
+                            return false;
                         }
                     }
                 },
