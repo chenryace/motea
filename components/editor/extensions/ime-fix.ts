@@ -56,12 +56,23 @@ export const IMEFix = Extension.create<IMEFixOptions>({
 
                 props: {
                     handleDOMEvents: {
-                        // 监听composition事件，同步状态到全局状态管理器
+                        // 增强的composition事件处理，借鉴Lexical的细粒度管理
                         compositionstart: (view, event) => {
-                            stateManager.updateCompositionState(true, event.data);
+                            const { from, to } = view.state.selection;
+                            const compositionId = `comp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+                            // 使用增强的状态管理（借鉴Lexical）
+                            stateManager.updateCompositionState(true, event.data, {
+                                range: { from, to },
+                                key: compositionId
+                            });
 
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix: Composition started', { data: event.data });
+                                console.log('🎯 IMEFix: Composition started', {
+                                    data: event.data,
+                                    compositionId,
+                                    range: { from, to }
+                                });
                             }
 
                             // 不阻止事件，让ProseMirror正常处理
@@ -69,20 +80,34 @@ export const IMEFix = Extension.create<IMEFixOptions>({
                         },
 
                         compositionupdate: (view, event) => {
-                            stateManager.updateCompositionState(true, event.data);
+                            // 保持当前的composition状态，但可以更新数据
+                            stateManager.updateCompositionState(true, event.data, {
+                                forceUpdate: false // 避免过多的状态更新
+                            });
 
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix: Composition updating', { data: event.data });
+                                console.log('🎯 IMEFix: Composition updating', {
+                                    data: event.data,
+                                    anomalyCount: stateManager.getState().anomalyCount
+                                });
                             }
 
                             return false;
                         },
 
                         compositionend: (view, event) => {
-                            stateManager.updateCompositionState(false, event.data);
+                            // 结束composition，清理状态
+                            stateManager.updateCompositionState(false, event.data, {
+                                forceUpdate: true // 确保状态被正确清理
+                            });
 
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix: Composition ended', { data: event.data });
+                                const state = stateManager.getState();
+                                console.log('🎯 IMEFix: Composition ended', {
+                                    data: event.data,
+                                    anomalyCount: state.anomalyCount,
+                                    environment: state.environment
+                                });
                             }
 
                             return false;
