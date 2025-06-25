@@ -1,14 +1,18 @@
 /**
- * 统一的IME状态管理器
- * 解决多个状态源不同步的问题
+ * 简化的IME状态管理器
+ * 基于ProseMirror最佳实践，采用最小干预原则
+ *
+ * 设计理念：
+ * 1. 信任ProseMirror - 让ProseMirror处理大部分IME逻辑
+ * 2. 最小干预 - 只跟踪必要的composition状态
+ * 3. 避免冲突 - 不与ProseMirror内置处理产生冲突
+ * 4. 简单可靠 - 移除复杂的定时器和多层事件处理
  */
 
 export interface IMEState {
     isComposing: boolean;
-    isTyping: boolean;
-    isDeleting: boolean;
-    lastInputTime: number;
-    lastInputType: string | null;
+    lastCompositionData: string | null;
+    lastEventTime: number;
 }
 
 export type IMEStateListener = (state: IMEState) => void;
@@ -16,138 +20,56 @@ export type IMEStateListener = (state: IMEState) => void;
 export class IMEStateManager {
     private state: IMEState = {
         isComposing: false,
-        isTyping: false,
-        isDeleting: false,
-        lastInputTime: 0,
-        lastInputType: null,
+        lastCompositionData: null,
+        lastEventTime: 0,
     };
 
     private listeners = new Set<IMEStateListener>();
-    private typingTimer: NodeJS.Timeout | null = null;
     private debug: boolean;
-
-    // 保存绑定后的事件处理器引用
-    private boundHandlers = {
-        compositionStart: this.handleCompositionStart.bind(this),
-        compositionUpdate: this.handleCompositionUpdate.bind(this),
-        compositionEnd: this.handleCompositionEnd.bind(this),
-        beforeInput: this.handleBeforeInput.bind(this),
-        keyDown: this.handleKeyDown.bind(this)
-    };
 
     constructor(options: { debug?: boolean } = {}) {
         this.debug = options.debug || false;
-        this.init();
-    }
-
-    private init() {
-        if (typeof window === 'undefined') return;
-
-        // 使用预绑定的事件处理器
-        document.addEventListener('compositionstart', this.boundHandlers.compositionStart, true);
-        document.addEventListener('compositionupdate', this.boundHandlers.compositionUpdate, true);
-        document.addEventListener('compositionend', this.boundHandlers.compositionEnd, true);
-        document.addEventListener('beforeinput', this.boundHandlers.beforeInput, true);
-        document.addEventListener('keydown', this.boundHandlers.keyDown, true);
 
         if (this.debug) {
-            console.log('🎯 IMEStateManager: Initialized');
+            console.log('🎯 IMEStateManager: Initialized with minimal intervention approach');
         }
     }
 
-    private handleCompositionStart(event: CompositionEvent) {
-        this.updateState({ isComposing: true });
-        if (this.debug) {
-            console.log('🎯 IMEStateManager: Composition started', { data: event.data });
-        }
-    }
-
-    private handleCompositionUpdate(event: CompositionEvent) {
-        // 确保在组合输入过程中保持 isComposing 状态
-        this.updateState({
-            isComposing: true,
-            lastInputTime: Date.now()
-        });
-        if (this.debug) {
-            console.log('🎯 IMEStateManager: Composition updating', { data: event.data });
-        }
-    }
-
-    private handleCompositionEnd(event: CompositionEvent) {
-        this.updateState({ isComposing: false });
-        this.resetTypingTimer();
-        if (this.debug) {
-            console.log('🎯 IMEStateManager: Composition ended', { data: event.data });
-        }
-    }
-
-    private handleBeforeInput(event: InputEvent) {
-        const { inputType, data } = event;
-        const now = Date.now();
-
-        this.updateState({
-            isTyping: true,
-            isDeleting: inputType.includes('delete'),
-            lastInputTime: now,
-            lastInputType: inputType
-        });
-
-        this.resetTypingTimer();
-
-        if (this.debug) {
-            console.log('🎯 IMEStateManager: BeforeInput', { inputType, data });
-        }
-    }
-
-    private handleKeyDown(event: KeyboardEvent) {
-        if (event.key === 'Backspace' || event.key === 'Delete') {
-            this.updateState({
-                isTyping: true,
-                isDeleting: true,
-                lastInputTime: Date.now()
-            });
-            this.resetTypingTimer();
-        }
-    }
-
-    private resetTypingTimer() {
-        if (this.typingTimer) {
-            clearTimeout(this.typingTimer);
-        }
-
-        this.typingTimer = setTimeout(() => {
-            this.updateState({
-                isTyping: false,
-                isDeleting: false
-            });
-        }, 200);
-    }
-
-    private updateState(updates: Partial<IMEState>) {
+    /**
+     * 手动更新composition状态
+     * 主要由TipTap插件调用，避免重复的全局事件监听
+     */
+    updateCompositionState(isComposing: boolean, data?: string | null) {
         const oldState = { ...this.state };
-        this.state = { ...this.state, ...updates };
+        this.state = {
+            ...this.state,
+            isComposing,
+            lastCompositionData: data || null,
+            lastEventTime: Date.now()
+        };
 
         // 只在状态真正变化时通知监听器
-        if (this.hasStateChanged(oldState, this.state)) {
-            this.listeners.forEach(listener => {
-                try {
-                    listener(this.state);
-                } catch (error) {
-                    console.error('🎯 IMEStateManager: Listener error', error);
-                }
-            });
+        if (oldState.isComposing !== this.state.isComposing) {
+            this.notifyListeners();
 
             if (this.debug) {
-                console.log('🎯 IMEStateManager: State updated', this.state);
+                console.log('🎯 IMEStateManager: Composition state updated', {
+                    isComposing,
+                    data,
+                    timestamp: this.state.lastEventTime
+                });
             }
         }
     }
 
-    private hasStateChanged(oldState: IMEState, newState: IMEState): boolean {
-        return oldState.isComposing !== newState.isComposing ||
-               oldState.isTyping !== newState.isTyping ||
-               oldState.isDeleting !== newState.isDeleting ||
-               oldState.lastInputType !== newState.lastInputType;
+    private notifyListeners() {
+        this.listeners.forEach(listener => {
+            try {
+                listener(this.state);
+            } catch (error) {
+                console.error('🎯 IMEStateManager: Listener error', error);
+            }
+        });
     }
 
     /**
@@ -155,7 +77,7 @@ export class IMEStateManager {
      */
     subscribe(listener: IMEStateListener): () => void {
         this.listeners.add(listener);
-        
+
         // 返回取消订阅函数
         return () => {
             this.listeners.delete(listener);
@@ -177,14 +99,8 @@ export class IMEStateManager {
     }
 
     /**
-     * 检查是否正在输入
-     */
-    isTyping(): boolean {
-        return this.state.isTyping;
-    }
-
-    /**
      * 检查是否应该暂停昂贵操作
+     * 简化逻辑：只在composition期间暂停
      */
     shouldPauseExpensiveOperations(): boolean {
         return this.state.isComposing;
@@ -194,24 +110,19 @@ export class IMEStateManager {
      * 手动设置状态（用于测试和调试）
      */
     setState(updates: Partial<IMEState>) {
-        this.updateState(updates);
+        const oldState = { ...this.state };
+        this.state = { ...this.state, ...updates };
+
+        if (oldState.isComposing !== this.state.isComposing) {
+            this.notifyListeners();
+        }
     }
 
     /**
      * 销毁状态管理器
+     * 简化版本：只清理监听器
      */
     destroy() {
-        if (this.typingTimer) {
-            clearTimeout(this.typingTimer);
-        }
-
-        // 使用预绑定的事件处理器引用正确移除监听器
-        document.removeEventListener('compositionstart', this.boundHandlers.compositionStart, true);
-        document.removeEventListener('compositionupdate', this.boundHandlers.compositionUpdate, true);
-        document.removeEventListener('compositionend', this.boundHandlers.compositionEnd, true);
-        document.removeEventListener('beforeinput', this.boundHandlers.beforeInput, true);
-        document.removeEventListener('keydown', this.boundHandlers.keyDown, true);
-
         this.listeners.clear();
 
         if (this.debug) {
@@ -252,6 +163,7 @@ export function shouldPauseExpensiveOperations(): boolean {
 /**
  * 创建智能的onChange包装器
  * 在IME输入期间暂停昂贵操作，确保中文输入不被打断
+ * 简化版本：只在composition期间延迟执行
  */
 export function createSmartOnChange<T extends (...args: any[]) => any>(
     originalCallback: T,
@@ -279,12 +191,11 @@ export function createSmartOnChange<T extends (...args: any[]) => any>(
         if (debug) {
             console.log('🎯 SmartOnChange: Called', {
                 isComposing: state.isComposing,
-                isTyping: state.isTyping,
                 shouldPause: stateManager.shouldPauseExpensiveOperations()
             });
         }
 
-        // 如果正在IME输入或快速输入，延迟执行
+        // 如果正在IME输入，延迟执行
         if (stateManager.shouldPauseExpensiveOperations()) {
             pendingCall = { args, timestamp: Date.now() };
 
