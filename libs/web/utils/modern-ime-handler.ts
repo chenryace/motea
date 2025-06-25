@@ -144,12 +144,16 @@ export class ModernIMEHandler {
 
         // 🔥 优先处理composition事件，阻止ProseMirror自己的处理
         event.stopImmediatePropagation();
+        event.preventDefault();
 
         // 同步状态到ProseMirror
         this.syncCompositionStateToProseMirror(true);
 
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Composition started, blocked ProseMirror', { data: event.data });
+            console.log('🎯 ModernIMEHandler: Composition started, blocked ProseMirror', {
+                data: event.data,
+                target: event.target
+            });
         }
     }
 
@@ -159,31 +163,47 @@ export class ModernIMEHandler {
 
         // 阻止ProseMirror处理compositionupdate
         event.stopImmediatePropagation();
+        event.preventDefault();
 
         // 保持ProseMirror的composition状态
         this.syncCompositionStateToProseMirror(true);
 
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Composition updating, maintaining state', { data: event.data });
+            console.log('🎯 ModernIMEHandler: Composition updating, maintaining state', {
+                data: event.data,
+                isComposing: this.isComposing
+            });
         }
     }
 
     private handleCompositionEnd(event: CompositionEvent) {
-        this.isComposing = false;
-
         // 阻止ProseMirror自己的compositionend处理
         event.stopImmediatePropagation();
+        event.preventDefault();
+
+        if (this.options.debug) {
+            console.log('🎯 ModernIMEHandler: Composition ending', {
+                data: event.data,
+                wasComposing: this.isComposing
+            });
+        }
 
         // 先处理最终文本插入
-        if (event.data) {
+        if (event.data && this.isComposing) {
             this.insertFinalCompositionText(event.data);
         }
 
-        // 然后同步状态到ProseMirror
+        // 然后更新状态
+        this.isComposing = false;
+
+        // 最后同步状态到ProseMirror
         this.syncCompositionStateToProseMirror(false);
 
         if (this.options.debug) {
-            console.log('🎯 ModernIMEHandler: Composition ended, synced to ProseMirror', { data: event.data });
+            console.log('🎯 ModernIMEHandler: Composition ended, synced to ProseMirror', {
+                data: event.data,
+                finalText: event.data
+            });
         }
     }
     
@@ -199,6 +219,16 @@ export class ModernIMEHandler {
             });
         }
         
+        // 🔥 如果是composition相关的输入，阻止默认行为，避免重复处理
+        if (inputType === 'insertCompositionText') {
+            if (this.options.debug) {
+                console.log('🎯 ModernIMEHandler: Blocking insertCompositionText to prevent duplicate processing');
+            }
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+        }
+
         // 根据inputType决定处理策略
         if (this.shouldUseRestoreDOMForInput(inputType)) {
             // 阻止默认行为（如果可能）
@@ -210,7 +240,7 @@ export class ModernIMEHandler {
                     console.log('🎯 ModernIMEHandler: Cannot prevent default, will use RestoreDOM');
                 }
             }
-            
+
             // 使用RestoreDOM处理
             this.handleWithRestoreDOM(inputType, data, event);
         } else {
