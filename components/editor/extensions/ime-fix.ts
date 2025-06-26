@@ -1,22 +1,21 @@
 /**
- * TipTap IME扩展 - 基于Milkdown标准实现
+ * TipTap IME扩展 - 简化版本
+ * 基于ProseMirror最佳实践，采用最小干预原则
  *
- * 核心设计原则（参考Milkdown）：
- * 1. 维护 view.composing 状态 - 标准的ProseMirror IME状态
- * 2. 阻止 InputRule 执行 - 在composition期间禁用输入规则
- * 3. 命令执行防干扰 - 使用 view.composing 拦截命令
- * 4. Markdown 模式下标记延迟 - compositionend 后再触发解析
- * 5. 编辑器状态同步控制 - 所有扩展遵循组合期间禁写规则
+ * 设计理念：
+ * 1. 信任ProseMirror - 让ProseMirror处理大部分IME逻辑
+ * 2. 状态同步 - 只同步必要的composition状态到全局状态管理器
+ * 3. 避免冲突 - 不阻止或修改ProseMirror的内置IME处理
+ * 4. 简单可靠 - 移除复杂的RestoreDOM和事件拦截机制
  */
 
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from 'prosemirror-state';
-import { EditorView } from 'prosemirror-view';
 import { getGlobalIMEStateManager } from 'libs/web/utils/ime-state-manager';
 
 export interface IMEFixOptions {
     /**
-     * 是否启用IME处理
+     * 是否启用IME状态同步
      */
     enabled: boolean;
 
@@ -26,25 +25,66 @@ export interface IMEFixOptions {
     debug: boolean;
 
     /**
-     * 是否阻止InputRules在IME期间执行
+     * 是否启用快速输入检测
      */
-    blockInputRules: boolean;
+    enableRapidInputDetection: boolean;
 
     /**
-     * 是否阻止命令在IME期间执行
+     * 快速输入检测延时（毫秒）
      */
-    blockCommands: boolean;
+    rapidInputDelay: number;
 }
 
 interface IMEPluginState {
     isComposing: boolean;
     lastCompositionData: string | null;
     timestamp: number;
-    // Milkdown标准：记录composition开始时的选择范围
-    compositionRange: { from: number; to: number } | null;
+    // 快速输入检测相关
+    rapidInputDetected: boolean;
+    lastInputTime: number;
+    pendingCompositionTimeout: number | null;
 }
 
 const IMEFixPluginKey = new PluginKey<IMEPluginState>('ime-fix');
+
+/**
+ * 检测是否为快速输入（可能是中文输入的拼音）
+ */
+function isRapidInput(text: string, lastInputTime: number): boolean {
+    const now = Date.now();
+    const timeSinceLastInput = now - lastInputTime;
+
+    // 快速输入的特征：
+    // 1. 连续的字母输入
+    // 2. 时间间隔很短（< 100ms）
+    // 3. 不是明显的命令（如 #、*、> 等）
+    const isLettersOnly = /^[a-zA-Z]+$/.test(text);
+    const isRapid = timeSinceLastInput < 100;
+    const isNotCommand = !text.match(/^[#*>\-\+\[\]]/);
+
+    return isLettersOnly && isRapid && isNotCommand && text.length > 0;
+}
+
+/**
+ * 模拟触发composition事件
+ */
+function simulateCompositionStart(view: any, text: string, debug: boolean) {
+    if (debug) {
+        console.log('🚀 IMEFix: Simulating composition start for rapid input', { text });
+    }
+
+    // 创建并触发compositionstart事件
+    const compositionStartEvent = new CompositionEvent('compositionstart', {
+        data: text,
+        bubbles: true,
+        cancelable: true
+    });
+
+    // 在DOM元素上触发事件
+    if (view.dom) {
+        view.dom.dispatchEvent(compositionStartEvent);
+    }
+}
 
 export const IMEFix = Extension.create<IMEFixOptions>({
     name: 'ime-fix',
@@ -53,8 +93,8 @@ export const IMEFix = Extension.create<IMEFixOptions>({
         return {
             enabled: true,
             debug: false,
-            blockInputRules: true,  // Milkdown标准：阻止InputRules
-            blockCommands: true,    // Milkdown标准：阻止命令执行
+            enableRapidInputDetection: true,
+            rapidInputDelay: 20, // 20ms延时
         };
     },
 
@@ -70,43 +110,69 @@ export const IMEFix = Extension.create<IMEFixOptions>({
                 key: IMEFixPluginKey,
 
                 props: {
-                    // Milkdown标准1: 阻止InputRule执行
-                    handleTextInput: this.options.blockInputRules ? (view, from, to, text) => {
+                    // 核心：在InputRules层面添加快速输入检测
+                    handleTextInput: this.options.enableRapidInputDetection ? (view, from, to, text) => {
                         const pluginState = IMEFixPluginKey.getState(view.state);
-                        if (pluginState?.isComposing) {
-                            if (this.options.debug) {
-                                console.log('🚫 IMEFix: Blocking InputRule during composition', { text, from, to });
-                            }
-                            return true; // 阻止InputRules处理
-                        }
-                        return false;
-                    } : undefined,
 
-                    // Milkdown标准2: 阻止命令执行
-                    handleKeyDown: this.options.blockCommands ? (view, event) => {
-                        const pluginState = IMEFixPluginKey.getState(view.state);
-                        if (pluginState?.isComposing) {
-                            // 阻止可能干扰IME的按键
-                            if (event.key === 'Enter' || event.key === 'Tab' || event.key === 'Escape') {
-                                if (this.options.debug) {
-                                    console.log('🚫 IMEFix: Blocking command during composition', { key: event.key });
-                                }
-                                return true;
-                            }
+                        // 如果已经在composition状态，不干预
+                        if (view.composing || pluginState?.isComposing || pluginState?.rapidInputDetected) {
+                            return false;
                         }
-                        return false;
+
+                        // 检测是否为快速输入
+                        const isRapid = isRapidInput(text, pluginState?.lastInputTime || 0);
+
+                        if (isRapid) {
+                            if (this.options.debug) {
+                                console.log('🚀 IMEFix: Rapid input detected, redirecting to composition', {
+                                    text,
+                                    from,
+                                    to
+                                });
+                            }
+
+                            // 立即更新插件状态，标记为快速输入检测
+                            const tr = view.state.tr.setMeta(IMEFixPluginKey, {
+                                type: 'rapid-input-detected',
+                                text,
+                                from,
+                                to,
+                                timestamp: Date.now()
+                            });
+                            view.dispatch(tr);
+
+                            // 短延时后模拟composition事件，让composition流程接管
+                            setTimeout(() => {
+                                // 检查状态是否还有效（避免重复触发）
+                                const currentState = IMEFixPluginKey.getState(view.state);
+                                if (currentState?.rapidInputDetected) {
+                                    simulateCompositionStart(view, text, this.options.debug);
+                                }
+                            }, this.options.rapidInputDelay);
+
+                            return true; // 阻止原始InputRules处理
+                        }
+
+                        // 更新最后输入时间
+                        const tr = view.state.tr.setMeta(IMEFixPluginKey, {
+                            type: 'update-input-time',
+                            timestamp: Date.now()
+                        });
+                        view.dispatch(tr);
+
+                        return false; // 允许正常处理
                     } : undefined,
 
                     handleDOMEvents: {
-                        // Milkdown标准3: 维护composition状态
+                        // 监听真实的composition事件
                         compositionstart: (view, event) => {
                             const { from, to } = view.state.selection;
 
                             // 更新插件状态
                             const tr = view.state.tr.setMeta(IMEFixPluginKey, {
                                 type: 'composition-start',
-                                range: { from, to },
-                                data: event.data
+                                data: event.data,
+                                range: { from, to }
                             });
                             view.dispatch(tr);
 
@@ -116,7 +182,7 @@ export const IMEFix = Extension.create<IMEFixOptions>({
                             });
 
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix: Composition started (Milkdown style)', {
+                                console.log('🎯 IMEFix: Real composition started', {
                                     data: event.data,
                                     range: { from, to },
                                     viewComposing: (view as any).composing
@@ -146,46 +212,38 @@ export const IMEFix = Extension.create<IMEFixOptions>({
                             return false;
                         },
 
-                        // Milkdown标准4: compositionend后延迟处理
                         compositionend: (view, event) => {
+                            // 更新插件状态，清理所有composition相关状态
+                            const tr = view.state.tr.setMeta(IMEFixPluginKey, {
+                                type: 'composition-end',
+                                data: event.data
+                            });
+                            view.dispatch(tr);
+
+                            stateManager.updateCompositionState(false, event.data);
+
                             if (this.options.debug) {
-                                console.log('🎯 IMEFix: Composition ending', {
+                                console.log('🎯 IMEFix: Composition ended', {
                                     data: event.data,
                                     viewComposing: (view as any).composing
                                 });
                             }
-
-                            // Milkdown标准：延迟清理状态，确保所有相关处理完成
-                            setTimeout(() => {
-                                const tr = view.state.tr.setMeta(IMEFixPluginKey, {
-                                    type: 'composition-end',
-                                    data: event.data
-                                });
-                                view.dispatch(tr);
-
-                                stateManager.updateCompositionState(false, event.data);
-
-                                if (this.options.debug) {
-                                    console.log('🎯 IMEFix: Composition ended (delayed)', {
-                                        data: event.data,
-                                        viewComposing: (view as any).composing
-                                    });
-                                }
-                            }, 0); // 使用nextTick延迟
 
                             return false;
                         }
                     }
                 },
 
-                // Milkdown标准5: 状态管理
+                // 状态管理
                 state: {
                     init() {
                         return {
                             isComposing: false,
                             lastCompositionData: null,
                             timestamp: 0,
-                            compositionRange: null
+                            rapidInputDetected: false,
+                            lastInputTime: 0,
+                            pendingCompositionTimeout: null
                         };
                     },
 
@@ -194,13 +252,25 @@ export const IMEFix = Extension.create<IMEFixOptions>({
                         if (!meta) return value;
 
                         switch (meta.type) {
+                            case 'rapid-input-detected':
+                                return {
+                                    ...value,
+                                    rapidInputDetected: true,
+                                    lastInputTime: meta.timestamp,
+                                    timestamp: meta.timestamp
+                                };
+                            case 'update-input-time':
+                                return {
+                                    ...value,
+                                    lastInputTime: meta.timestamp
+                                };
                             case 'composition-start':
                                 return {
                                     ...value,
                                     isComposing: true,
+                                    rapidInputDetected: false, // 真实composition开始，清除快速输入标记
                                     lastCompositionData: meta.data,
-                                    timestamp: Date.now(),
-                                    compositionRange: meta.range
+                                    timestamp: Date.now()
                                 };
                             case 'composition-update':
                                 return {
@@ -212,9 +282,10 @@ export const IMEFix = Extension.create<IMEFixOptions>({
                                 return {
                                     ...value,
                                     isComposing: false,
+                                    rapidInputDetected: false, // 清除所有标记
                                     lastCompositionData: meta.data,
                                     timestamp: Date.now(),
-                                    compositionRange: null
+                                    pendingCompositionTimeout: null
                                 };
                             default:
                                 return value;

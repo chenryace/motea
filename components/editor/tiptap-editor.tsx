@@ -34,9 +34,6 @@ import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
 import IMEFix from './extensions/ime-fix';
-import MilkdownInputRules from './extensions/milkdown-input-rules';
-import MilkdownPasteHandler from './extensions/milkdown-paste-handler';
-import MilkdownHistory from './extensions/milkdown-history';
 import Indent from './extensions/indent';
 import FloatingToolbar from './floating-toolbar';
 
@@ -74,7 +71,6 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
         extensions: [
             StarterKit.configure({
                 heading: false, // 禁用默认heading，使用我们自定义的
-                history: false, // 禁用默认history，使用Milkdown风格的
                 codeBlock: {
                     languageClassPrefix: 'language-',
                 },
@@ -113,27 +109,12 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
             SlashCommands.configure({
                 suggestion: suggestion(),
             }),
-            // Milkdown风格的扩展套件 - 按优先级顺序
-            MilkdownHistory.configure({
-                enabled: true,
-                debug: process.env.NODE_ENV === 'development',
-                depth: 100,
-                newGroupDelay: 500,
-            }),
-            MilkdownInputRules.configure({
-                enabled: true,
-                debug: process.env.NODE_ENV === 'development',
-            }),
-            MilkdownPasteHandler.configure({
-                enabled: true,
-                debug: process.env.NODE_ENV === 'development',
-            }),
-            // IME 输入法优化扩展 - 基于Milkdown标准
+            // IME 输入法优化扩展 - 快速输入检测方案
             IMEFix.configure({
                 enabled: true,
                 debug: process.env.NODE_ENV === 'development',
-                blockInputRules: true,  // 阻止InputRules在IME期间执行
-                blockCommands: true,    // 阻止命令在IME期间执行
+                enableRapidInputDetection: true,
+                rapidInputDelay: 20, // 20ms延时
             }),
             // 缩进扩展
             Indent.configure({
