@@ -18,7 +18,13 @@
         "strict": true,
         "target": "esnext",
         "baseUrl": ".",
-        "incremental": true
+        "incremental": true,
+        "paths": {
+            "libs/*": ["./libs/*"],
+            "components/*": ["./components/*"],
+            "pages/*": ["./pages/*"],
+            "public/*": ["./public/*"]
+        }
     },
     "exclude": ["node_modules"],
     "include": ["**/*.ts", "**/*.tsx", "additional.d.ts"]

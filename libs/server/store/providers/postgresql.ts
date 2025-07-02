@@ -48,14 +48,62 @@ export class StorePostgreSQL extends StoreProvider {
 
     constructor(config: PostgreSQLConfig) {
         super(config);
+
+        // 🎯 智能环境检测
+        const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
+        const isDocker = !!(process.env.DOCKER || process.env.HOSTNAME === '0.0.0.0');
+        const isProduction = process.env.NODE_ENV === 'production';
+
+        // 🔧 根据部署环境智能配置连接池
+        const poolConfig = this.getOptimalPoolConfig(isServerless, isDocker, isProduction);
+
         this.pool = new Pool({
             connectionString: config.connectionString,
-            ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-            max: 3, 
-            idleTimeoutMillis: 30000, 
-            connectionTimeoutMillis: 5000,
-            statement_timeout: 10000, 
+            ssl: isProduction && !isDocker ? { rejectUnauthorized: false } : false,
+            ...poolConfig,
         });
+
+        // 📊 记录配置信息
+        this.logger.info('PostgreSQL pool configured:', {
+            environment: isServerless ? 'serverless' : isDocker ? 'docker' : 'traditional',
+            maxConnections: poolConfig.max,
+            minConnections: poolConfig.min || 0,
+            idleTimeout: poolConfig.idleTimeoutMillis,
+        });
+    }
+
+    /**
+     * 根据部署环境获取最优连接池配置
+     */
+    private getOptimalPoolConfig(isServerless: boolean, isDocker: boolean, isProduction: boolean) {
+        if (isServerless) {
+            // Vercel/Serverless 环境：保守配置，避免超出 Neon 连接限制
+            return {
+                max: 2,                    // 最大2个连接，避免多个 Lambda 实例累积过多连接
+                min: 0,                    // 最小0个，允许完全释放连接
+                idleTimeoutMillis: 10000,  // 10秒快速释放，适应 Serverless 短生命周期
+                connectionTimeoutMillis: 5000,
+                statement_timeout: 8000,   // 稍短的语句超时，适应 Serverless 限制
+            };
+        } else if (isDocker) {
+            // Docker 环境：激进配置，充分利用内建数据库性能
+            return {
+                max: isProduction ? 10 : 6,  // 生产环境更多连接，开发环境适中
+                min: 2,                      // 保持最少2个连接，减少连接建立开销
+                idleTimeoutMillis: 60000,    // 60秒保持连接，适应长期运行
+                connectionTimeoutMillis: 5000,
+                statement_timeout: 15000,    // 更长的语句超时，适应复杂查询
+            };
+        } else {
+            // 传统部署：平衡配置
+            return {
+                max: isProduction ? 6 : 4,
+                min: 1,
+                idleTimeoutMillis: 30000,
+                connectionTimeoutMillis: 5000,
+                statement_timeout: 10000,
+            };
+        }
     }
 
     private async ensureTablesInitialized(): Promise<void> {
@@ -412,6 +460,91 @@ export class StorePostgreSQL extends StoreProvider {
         } catch (error) {
             this.logger.error('Error updating tree:', error);
             throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * 🚀 批量获取对象元数据 - 性能优化
+     * 解决 N+1 查询问题，将多次查询合并为一次
+     */
+    async batchGetObjectMeta(paths: string[]): Promise<Array<{ [key: string]: string } | undefined>> {
+        if (paths.length === 0) {
+            return [];
+        }
+
+        const client = await this.pool.connect();
+        try {
+            // 🎯 使用 IN 查询批量获取元数据
+            const placeholders = paths.map((_, index) => `$${index + 1}`).join(', ');
+            const fullPaths = paths.map(path => this.getPath(path));
+
+            const result = await client.query(
+                `SELECT path, metadata FROM notes WHERE path IN (${placeholders}) ORDER BY path`,
+                fullPaths
+            );
+
+            // 📊 创建路径到元数据的映射
+            const metaMap = new Map<string, any>();
+            result.rows.forEach(row => {
+                metaMap.set(row.path, row.metadata || {});
+            });
+
+            // 🔄 按原始顺序返回结果，缺失的返回 undefined
+            return fullPaths.map(fullPath => metaMap.get(fullPath));
+        } catch (error) {
+            this.logger.error('Error batch getting object metadata:', error);
+            // 🛡️ 降级到单个查询
+            return Promise.all(paths.map(path => this.getObjectMeta(path)));
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * 🚀 批量获取对象内容和元数据 - 性能优化
+     */
+    async batchGetObjectAndMeta(paths: string[]): Promise<Array<{
+        content?: string;
+        meta?: { [key: string]: string };
+        contentType?: string;
+        updated_at?: string;
+    }>> {
+        if (paths.length === 0) {
+            return [];
+        }
+
+        const client = await this.pool.connect();
+        try {
+            const placeholders = paths.map((_, index) => `$${index + 1}`).join(', ');
+            const fullPaths = paths.map(path => this.getPath(path));
+
+            const result = await client.query(
+                `SELECT path, content, metadata, content_type, updated_at
+                 FROM notes
+                 WHERE path IN (${placeholders})
+                 ORDER BY path`,
+                fullPaths
+            );
+
+            // 📊 创建路径到数据的映射
+            const dataMap = new Map<string, any>();
+            result.rows.forEach(row => {
+                dataMap.set(row.path, {
+                    content: row.content,
+                    meta: row.metadata || {},
+                    contentType: row.content_type,
+                    updated_at: row.updated_at ? row.updated_at.toISOString() : undefined,
+                });
+            });
+
+            // 🔄 按原始顺序返回结果，缺失的返回空对象
+            return fullPaths.map(fullPath => dataMap.get(fullPath) || {});
+        } catch (error) {
+            this.logger.error('Error batch getting objects and metadata:', error);
+            // 🛡️ 降级到单个查询
+            return Promise.all(paths.map(path => this.getObjectAndMeta(path)));
         } finally {
             client.release();
         }

@@ -19,7 +19,7 @@ import UIState from 'libs/web/state/ui';
 import { has } from 'lodash';
 // import { ROOT_ID } from 'libs/shared/const';
 import { parseMarkdownTitle } from 'libs/shared/markdown/parse-markdown-title';
-import { wrapEditorChangeForIME } from 'libs/web/utils/simple-ime-fix';
+import { createSmartOnChange } from 'libs/web/utils/ime-state-manager';
 const ROOT_ID = 'root';
 
 const useTiptapEditor = (initNote?: NoteModel) => {
@@ -62,13 +62,7 @@ const useTiptapEditor = (initNote?: NoteModel) => {
 
             const updatedNote = { ...baseNote, ...data };
 
-            // 调试信息：记录保存的内容
-            console.log('💾 Saving to IndexedDB:', {
-                noteId: note.id,
-                contentLength: data.content?.length || 0,
-                title: data.title,
-                hasContent: !!data.content
-            });
+
 
             await noteCache.setItem(note.id, updatedNote);
         },
@@ -185,11 +179,7 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         async (value: () => string): Promise<void> => {
             const content = value();
 
-            // 调试信息：记录编辑器变化
-            console.log('✏️ Editor content changed:', {
-                contentLength: content.length,
-                contentPreview: content.substring(0, 100) + (content.length > 100 ? '...' : '')
-            });
+
 
             let title: string;
             if (note?.isDailyNote) {
@@ -236,8 +226,10 @@ const useTiptapEditor = (initNote?: NoteModel) => {
         [saveToIndexedDB, note?.isDailyNote, note?.id]
     );
 
-    // 使用 IME 安全的包装器
-    const onEditorChange = wrapEditorChangeForIME(originalOnEditorChange, 600);
+    // 使用智能onChange包装器 - 基于输入状态智能处理
+    const onEditorChange = createSmartOnChange(originalOnEditorChange, {
+        delay: 200 // 快速输入结束后200ms执行
+    });
 
     // Function to handle title changes specifically
     const onTitleChange = useCallback(

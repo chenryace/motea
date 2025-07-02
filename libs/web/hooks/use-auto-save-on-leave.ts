@@ -27,6 +27,7 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
     const router = useRouter();
     const isAutoSavingRef = useRef(false);
 
+
     const shouldAutoSave = useCallback(() => {
         if (typeof window !== 'undefined' && (window as any).saveButtonStatus) {
             return (window as any).saveButtonStatus === 'save';
@@ -46,60 +47,67 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
         return false;
     }, []);
 
-    const handleBeforeUnload = useCallback(async (event: BeforeUnloadEvent) => {
+    const handleBeforeUnload = useCallback((event: BeforeUnloadEvent) => {
         if (!enabled) return;
 
         if (shouldAutoSave()) {
+            // 显示确认对话框，但不执行任何保存操作
             event.preventDefault();
-            event.returnValue = 'Auto-saving, please wait...';
+            event.returnValue = '您有未保存的更改。确定要离开吗？';
 
-            performAutoSave();
+            // 使用一个简单的延迟来检测用户选择
+            // 如果用户选择"离开"，页面会立即卸载，这个setTimeout不会执行
+            // 如果用户选择"取消"，这个setTimeout会在用户回到页面后执行
+            setTimeout(() => {
+                // 如果能执行到这里，说明用户选择了"取消"
+                performAutoSave();
+            }, 100);
 
-            return 'Auto-saving, please wait...';
+            return '您有未保存的更改。确定要离开吗？';
         }
     }, [enabled, shouldAutoSave, performAutoSave]);
 
-    const handleRouteChangeStart = useCallback((url: string) => {
+    const handleRouteChangeStart = useCallback(async (url: string) => {
         if (!enabled || isAutoSavingRef.current) return;
 
         if (shouldAutoSave()) {
             isAutoSavingRef.current = true;
 
-            router.events.emit('routeChangeError', 'Auto-saving before route change', url);
+            // 阻止路由跳转
+            router.events.emit('routeChangeError', new Error('Auto-saving before route change'), url);
 
-            performAutoSave()
-                .then((success) => {
-                    if (success) {
-                        isAutoSavingRef.current = false;
-                        router.push(url);
-                    } else {
-                        isAutoSavingRef.current = false;
-                        const confirmed = window.confirm(
-                            'Auto-save failed. Force leave?'
-                        );
-                        if (confirmed) {
-                            router.push(url);
-                        }
-                    }
-                })
-                .catch((error) => {
-                    isAutoSavingRef.current = false;
-                    const confirmed = window.confirm(
-                        'Auto-save error. Force leave?'
-                    );
+            try {
+                const success = await performAutoSave();
+                isAutoSavingRef.current = false;
+
+                if (success) {
+                    // 自动保存成功，继续跳转
+                    router.push(url);
+                } else {
+                    // 自动保存失败，询问用户
+                    const confirmed = window.confirm('自动保存失败。是否强制离开？');
                     if (confirmed) {
                         router.push(url);
                     }
-                });
-
-            throw 'Auto-saving, please wait...';
+                }
+            } catch (error) {
+                isAutoSavingRef.current = false;
+                // 自动保存出错，询问用户
+                const confirmed = window.confirm('自动保存出错。是否强制离开？');
+                if (confirmed) {
+                    router.push(url);
+                }
+            }
         }
     }, [enabled, shouldAutoSave, performAutoSave, router]);
+
+
 
     useEffect(() => {
         if (!enabled) return;
 
         window.addEventListener('beforeunload', handleBeforeUnload);
+
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
