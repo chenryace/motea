@@ -23,6 +23,7 @@ import { FC } from 'react';
 import { NoteModel } from 'libs/shared/note';
 import { EDITOR_SIZE } from 'libs/shared/meta';
 import TiptapEditorState from 'libs/web/state/tiptap-editor';
+import IMEDebug from 'components/debug/ime-debug';
 
 const TiptapMainEditor: FC<
     TiptapEditorProps & {
@@ -82,6 +83,8 @@ const TiptapMainEditor: FC<
                 {...props}
             />
             {!isPreview && <Backlinks />}
+            {/* IME调试组件 - 强制启用以解决生产环境IME问题 */}
+            <IMEDebug enabled={true} />
         </article>
     );
 };

@@ -33,6 +33,8 @@ import MarkdownExtension, { CustomHeading } from './extensions/markdown';
 import SlashCommands from './extensions/slash-commands';
 import ImageMarkdown from './extensions/image-markdown';
 import suggestion from './extensions/slash-suggestion';
+import IMEFix from './extensions/ime-fix';
+import Indent from './extensions/indent';
 import FloatingToolbar from './floating-toolbar';
 
 export interface TiptapEditorProps {
@@ -107,6 +109,19 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
             SlashCommands.configure({
                 suggestion: suggestion(),
             }),
+            // IME 输入法优化扩展 - 快速输入检测方案
+            IMEFix.configure({
+                enabled: true,
+                debug: process.env.NODE_ENV === 'development',
+                enableRapidInputDetection: true,
+                rapidInputDelay: 20, // 20ms延时
+            }),
+            // 缩进扩展
+            Indent.configure({
+                indentSize: 2, // 每级缩进2个空格
+                maxIndentLevel: 10, // 最大10级缩进
+                types: ['paragraph', 'heading', 'blockquote'], // 支持缩进的节点类型
+            }),
         ],
         content: value,
         editable: !readOnly,
@@ -118,10 +133,19 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
                 autocomplete: 'off',
             },
         },
-        onUpdate: ({ editor }) => {
+        onUpdate: ({ editor, transaction }) => {
             if (onChange) {
-                const markdown = editor.storage.markdown?.transformer?.serialize(editor.state.doc) || editor.getHTML();
-                onChange(() => markdown);
+                // 只在文档真正变化时才处理
+                if (!transaction.docChanged) {
+                    return;
+                }
+
+                // 延迟序列化，避免在快速输入时阻塞
+                const getMarkdown = () => {
+                    return editor.storage.markdown?.transformer?.serialize(editor.state.doc) || editor.getHTML();
+                };
+
+                onChange(getMarkdown);
             }
         },
         onCreate: ({ editor }) => {
@@ -451,6 +475,23 @@ const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(({
 
                 .dark .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
                     color: #9ca3af;
+                }
+
+                /* 缩进样式 */
+                .ProseMirror [style*="margin-left"] {
+                    transition: margin-left 0.2s ease;
+                }
+
+                /* 确保缩进的元素保持正确的间距 */
+                .ProseMirror p[style*="margin-left"],
+                .ProseMirror h1[style*="margin-left"],
+                .ProseMirror h2[style*="margin-left"],
+                .ProseMirror h3[style*="margin-left"],
+                .ProseMirror h4[style*="margin-left"],
+                .ProseMirror h5[style*="margin-left"],
+                .ProseMirror h6[style*="margin-left"],
+                .ProseMirror blockquote[style*="margin-left"] {
+                    position: relative;
                 }
             `}</style>
         </div>

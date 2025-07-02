@@ -46,17 +46,25 @@ class MarkdownTransformer {
     private nodeToMarkdown(node: any): string {
         if (!node) return '';
 
+        // 处理缩进
+        const indent = node.attrs?.indent || 0;
+        const indentStr = '  '.repeat(indent); // 每级缩进2个空格
+
         switch (node.type) {
             case 'paragraph':
-                return this.inlineToMarkdown(node.content) + '\n\n';
+                const paragraphContent = this.inlineToMarkdown(node.content);
+                return indentStr + paragraphContent + '\n\n';
             case 'heading':
                 const level = node.attrs?.level || 1;
-                return '#'.repeat(level) + ' ' + this.inlineToMarkdown(node.content) + '\n\n';
+                const headingContent = '#'.repeat(level) + ' ' + this.inlineToMarkdown(node.content);
+                return indentStr + headingContent + '\n\n';
             case 'codeBlock':
                 const lang = node.attrs?.language || '';
-                return '```' + lang + '\n' + (node.content?.[0]?.text || '') + '\n```\n\n';
+                const codeContent = '```' + lang + '\n' + (node.content?.[0]?.text || '') + '\n```';
+                return indentStr + codeContent + '\n\n';
             case 'blockquote':
-                return '> ' + this.inlineToMarkdown(node.content) + '\n\n';
+                const quoteContent = '> ' + this.inlineToMarkdown(node.content);
+                return indentStr + quoteContent + '\n\n';
             case 'bulletList':
                 return this.listToMarkdown(node.content, '- ') + '\n';
             case 'orderedList':
@@ -64,16 +72,15 @@ class MarkdownTransformer {
             case 'listItem':
                 return this.inlineToMarkdown(node.content);
             case 'horizontalRule':
-                return '---\n\n';
+                return indentStr + '---\n\n';
             case 'image':
                 const src = node.attrs?.src || '';
                 const alt = node.attrs?.alt || '';
                 const title = node.attrs?.title || '';
-                if (title && title !== alt) {
-                    return `![${alt}](${src} "${title}")\n\n`;
-                } else {
-                    return `![${alt}](${src})\n\n`;
-                }
+                const imageContent = title && title !== alt
+                    ? `![${alt}](${src} "${title}")`
+                    : `![${alt}](${src})`;
+                return indentStr + imageContent + '\n\n';
             default:
                 return this.inlineToMarkdown(node.content);
         }
@@ -307,12 +314,10 @@ export const MarkdownExtension = Extension.create({
                 }
                 return true;
             },
-            'Tab': () => this.editor.commands.sinkListItem('listItem'),
-            'Shift-Tab': () => this.editor.commands.liftListItem('listItem'),
             'Enter': () => {
                 const { state } = this.editor;
                 const { $from } = state.selection;
-                
+
                 // 如果在空的列表项中按回车，跳出列表
                 if ($from.parent.type.name === 'listItem' && $from.parent.textContent === '') {
                     return this.editor.commands.liftListItem('listItem');

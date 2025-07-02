@@ -63,7 +63,6 @@
         "lodash": "^4.17.21",
         "lzutf8": "^0.6.0",
         "markdown-it": "^14.1.0",
-        "markdown-link-extractor": "^4.0.1",
         "md5": "^2.3.0",
         "nanoid": "^3.1.22",
         "next": "^12.3.4",
