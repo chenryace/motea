@@ -1,3 +1,20 @@
+/**
+ * Notes CRUD API
+ *
+ * Copyright (c) 2025 waycaan
+ * Licensed under the MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ */
+
 import { api } from 'libs/server/connect';
 import { metaToJson, jsonToMeta } from 'libs/server/meta';
 import { useAuth } from 'libs/server/middlewares/auth';
@@ -23,9 +40,9 @@ export async function getNote(
 
     return {
         id,
-        content: content || '\n',
+        content: content || '', // 不要默认为 '\n'，让前端处理空内容
         ...jsonMeta,
-        updated_at, 
+        updated_at,
     } as NoteModel;
 }
 
@@ -79,17 +96,21 @@ export default api()
             id: id, 
         };
 
-        console.log('🔧 Notes API updating content for note with title:', updatedMetaJson.title);
+
+
+        // 检测内容格式
+        const isJSON = content && content.trim().startsWith('{') && content.trim().endsWith('}');
+        const contentType = isJSON ? 'application/json' : 'text/markdown';
 
         if (!content || content.trim() === '\\') {
             await req.state.store.copyObject(notePath, notePath + '.bak', {
                 meta: metaWithId,
-                contentType: 'text/markdown',
+                contentType,
             });
         }
 
         await req.state.store.putObject(notePath, content, {
-            contentType: 'text/markdown',
+            contentType,
             meta: metaWithId,
         });
 
@@ -100,6 +121,6 @@ export default api()
             updated_at: new Date().toISOString(),
         };
 
-        console.log('🔧 Notes API returning updated note with title:', updatedNote.title);
+
         res.json(updatedNote);
     });

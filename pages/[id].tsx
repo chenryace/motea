@@ -5,7 +5,7 @@ import { applyAuth, applyRedirectLogin } from 'libs/server/middlewares/auth';
 import { applyNote } from 'libs/server/middlewares/note';
 import { applyTree } from 'libs/server/middlewares/tree';
 import LayoutPublic from 'components/layout/layout-public';
-import TiptapEditContainer from 'components/container/tiptap-edit-container';
+import LexicalEditContainer from 'components/container/lexical-edit-container';
 import { PostContainer } from 'components/container/post-container';
 import { applyCsrf } from 'libs/server/middlewares/csrf';
 import { ssr, SSRContext, ServerProps } from 'libs/server/connect';
@@ -23,7 +23,7 @@ export default function EditNotePage({
     if (isLoggedIn) {
         return (
             <LayoutMain tree={tree} note={note}>
-                <TiptapEditContainer />
+                <LexicalEditContainer />
             </LayoutMain>
         );
     }

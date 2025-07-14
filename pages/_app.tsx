@@ -1,5 +1,6 @@
 import 'tailwindcss/tailwind.css';
 import '@fontsource/noto-sans/latin.css';
+import 'components/editor/lexical-editor.css';
 
 import UIState from 'libs/web/state/ui';
 import { AppProps } from 'next/app';

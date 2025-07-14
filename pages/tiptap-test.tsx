@@ -3,13 +3,13 @@ import { useSession } from 'libs/server/middlewares/session';
 import { applySettings } from 'libs/server/middlewares/settings';
 import { applyAuth, applyRedirectLogin } from 'libs/server/middlewares/auth';
 import { applyTree } from 'libs/server/middlewares/tree';
-import TiptapEditContainer from 'components/container/tiptap-edit-container';
+import LexicalEditContainer from 'components/container/lexical-edit-container';
 import { applyCsrf } from 'libs/server/middlewares/csrf';
 import { ssr, SSRContext, ServerProps } from 'libs/server/connect';
 import { applyUA } from 'libs/server/middlewares/ua';
 import { applyReset } from 'libs/server/middlewares/reset';
 
-export default function TiptapTestPage({
+export default function LexicalTestPage({
     tree,
     note,
     isLoggedIn,
@@ -17,7 +17,7 @@ export default function TiptapTestPage({
     if (isLoggedIn) {
         return (
             <LayoutMain tree={tree} note={note}>
-                <TiptapEditContainer />
+                <LexicalEditContainer />
             </LayoutMain>
         );
     }
