@@ -1,11 +1,11 @@
 import IconButton from 'components/icon-button';
 import useI18n from 'libs/web/hooks/use-i18n';
-import TiptapEditorState from 'libs/web/state/tiptap-editor';
+import LexicalEditorState from 'libs/web/state/lexical-editor';
 import Link from 'next/link';
 import React, { FC, useEffect } from 'react';
 
 const Backlinks: FC = () => {
-    const { getBackLinks, onHoverLink, backlinks } = TiptapEditorState.useContainer();
+    const { getBackLinks, onHoverLink, backlinks } = LexicalEditorState.useContainer();
     const { t } = useI18n();
 
     useEffect(() => {

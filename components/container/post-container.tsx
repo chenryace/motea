@@ -4,8 +4,8 @@ import UIState from 'libs/web/state/ui';
 import InnerHTML from 'dangerously-set-html-content';
 import { NoteModel } from 'libs/shared/note';
 import pupa from 'pupa';
-import TiptapMainEditor from 'components/editor/tiptap-main-editor';
-import TiptapEditorState from 'libs/web/state/tiptap-editor';
+import LexicalMainEditor from 'components/editor/lexical-main-editor';
+import LexicalEditorState from 'libs/web/state/lexical-editor';
 
 const MAX_WIDTH = 900;
 
@@ -30,14 +30,14 @@ export const PostContainer: FC<{
 
     return (
         <>
-            <TiptapEditorState.Provider>
-                <TiptapMainEditor
+            <LexicalEditorState.Provider>
+                <LexicalMainEditor
                     isPreview={isPreview}
                     note={note}
                     className={className}
                     readOnly
                 />
-            </TiptapEditorState.Provider>
+            </LexicalEditorState.Provider>
             {isPreview ? null : (
                 <>
                     {injection ? (

@@ -10,10 +10,10 @@ import {
     useMemo,
     ChangeEvent,
 } from 'react';
-import TiptapEditorState from 'libs/web/state/tiptap-editor';
+import LexicalEditorState from 'libs/web/state/lexical-editor';
 
 const EditTitle: FC<{ readOnly?: boolean }> = ({ readOnly }) => {
-    const { editorEl, saveToIndexedDB, note } = TiptapEditorState.useContainer();
+    const { editorEl, saveToIndexedDB, note } = LexicalEditorState.useContainer();
     const router = useRouter();
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const onInputTitle = useCallback(
@@ -30,8 +30,9 @@ const EditTitle: FC<{ readOnly?: boolean }> = ({ readOnly }) => {
     const onTitleChange = useCallback(
         (event: ChangeEvent<HTMLTextAreaElement>) => {
             const title = event.target.value;
-            saveToIndexedDB({ title })
-                ?.catch((v) => console.error('Error whilst changing title: %O', v));
+            saveToIndexedDB({ title })?.catch((v) =>
+                console.error('Error whilst changing title: %O', v)
+            );
         },
         [saveToIndexedDB]
     );

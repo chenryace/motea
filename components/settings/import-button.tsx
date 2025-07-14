@@ -1,3 +1,20 @@
+/**
+ * Import Button Component
+ *
+ * Copyright (c) 2025 waycaan
+ * Licensed under the MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ */
+
 import { ChangeEvent, FC, useCallback, useEffect, useState } from 'react';
 import useI18n from 'libs/web/hooks/use-i18n';
 import { ButtonProps } from './type';
@@ -7,7 +24,8 @@ import { useRouter } from 'next/router';
 import { ROOT_ID } from 'libs/shared/tree';
 import NoteState from 'libs/web/state/note';
 import { NoteModel } from 'libs/shared/note';
-import markdownProcessor from 'libs/web/utils/markdown-processor';
+import lexicalMarkdownProcessor from 'libs/web/utils/markdown-processor';
+import { parseMarkdownTitle } from 'libs/shared/markdown/parse-markdown-title';
 
 const readFileAsText = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -64,11 +82,11 @@ export const ImportButton: FC<ButtonProps> = ({ parentId = ROOT_ID }) => {
                         }
                         console.log(`Created note shell for ${fileName} with ID: ${newNote.id}`);
 
-                        // 2. 处理 markdown 内容，转换为 TipTap 可以理解的格式
-                        const processedContent = markdownProcessor.processImportedContent(markdownContent);
-                        console.log('Processed content for TipTap:', JSON.stringify(processedContent));
+                        // 2. 处理 markdown 内容，前端转换为 JSON 格式
+                        const processedContent = await lexicalMarkdownProcessor.processImportedContent(markdownContent);
+                        console.log('Processed content for Lexical (JSON):', processedContent.substring(0, 200) + '...');
 
-                        // 3. Update the note with processed content using mutateNote
+                        // 3. Update the note with processed JSON content
                         await mutateNote(newNote.id, { content: processedContent });
 
                         console.log(`Successfully imported and saved: ${fileName} (ID: ${newNote.id})`);

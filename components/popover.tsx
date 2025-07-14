@@ -54,8 +54,8 @@ const Popover: FC<Props> = ({
         }
 
         return () => {
-            anchorRef.current?.addEventListener('mouseover', handleEnter);
-            anchorRef.current?.addEventListener('mouseleave', handleLeave);
+            anchorRef.current?.removeEventListener('mouseover', handleEnter);
+            anchorRef.current?.removeEventListener('mouseleave', handleLeave);
             handleClose();
         };
     }, [handleEnter, handleLeave, props.anchorEl, handleClose]);

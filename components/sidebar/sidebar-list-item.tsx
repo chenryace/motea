@@ -1,6 +1,6 @@
 import { NoteModel } from 'libs/shared/note';
 import Link from 'next/link';
-import { FC, ReactText, MouseEvent, useCallback, useMemo } from 'react';
+import { FC, ReactText, MouseEvent, useCallback, useMemo, useState } from 'react';
 import classNames from 'classnames';
 import { useRouter } from 'next/router';
 import HotkeyTooltip from 'components/hotkey-tooltip';
@@ -53,6 +53,16 @@ const SidebarListItem: FC<{
         menu: { open, setData, setAnchor },
     } = PortalState.useContainer();
 
+    // 添加hover状态来控制按钮显示
+    const [isHovered, setIsHovered] = useState(false);
+
+    // 提取图标选择逻辑
+    const getIconType = useCallback(() => {
+        if (hasChildren || isExpanded) return 'ChevronRight';
+        if (item.title) return 'DocumentText';
+        return 'Document';
+    }, [hasChildren, isExpanded, item.title]);
+
     const onAddNote = useCallback(
         (e: MouseEvent) => {
             e.preventDefault();
@@ -91,6 +101,17 @@ const SidebarListItem: FC<{
         return undefined;
     }, [item.title]);
 
+    // 提取标题显示逻辑（必须在emoji声明之后）
+    const getDisplayTitle = useCallback(() => {
+        if (!initLoaded) return <TextSkeleton />;
+
+        const baseTitle = emoji
+            ? item.title.replace(emoji, '').trimLeft()
+            : item.title;
+
+        return baseTitle || t('Untitled');
+    }, [emoji, item.title, initLoaded, t]);
+
     return (
         <>
             <div
@@ -103,6 +124,8 @@ const SidebarListItem: FC<{
                         'bg-gray-200': query.id === item.id,
                     }
                 )}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
             >
                 <Link href={`/${item.id}`} shallow>
                     <a className="flex flex-1 items-center truncate px-2 py-1.5">
@@ -118,13 +141,7 @@ const SidebarListItem: FC<{
                         ) : (
                             <IconButton
                                 className="mr-1"
-                                icon={
-                                    hasChildren || isExpanded
-                                        ? 'ChevronRight'
-                                        : item.title
-                                        ? 'DocumentText'
-                                        : 'Document'
-                                }
+                                icon={getIconType()}
                                 iconClassName={classNames(
                                     'transition-transform transform',
                                     {
@@ -136,29 +153,29 @@ const SidebarListItem: FC<{
                         )}
 
                         <span className="flex-1 truncate" dir="auto">
-                            {(emoji
-                                ? item.title.replace(emoji, '').trimLeft()
-                                : item.title) ||
-                                (initLoaded ? t('Untitled') : <TextSkeleton />)}
+                            {getDisplayTitle()}
                         </span>
                     </a>
                 </Link>
 
-                <HotkeyTooltip text={t('Remove, Copy Link, etc')}>
-                    <IconButton
-                        icon="DotsHorizontal"
-                        onClick={handleClickMenu}
-                        className="hidden group-hover:block"
-                    ></IconButton>
-                </HotkeyTooltip>
+                {isHovered && (
+                    <>
+                        <HotkeyTooltip text={t('Remove, Copy Link, etc')}>
+                            <IconButton
+                                icon="DotsHorizontal"
+                                onClick={handleClickMenu}
+                            ></IconButton>
+                        </HotkeyTooltip>
 
-                <HotkeyTooltip text={t('Add a page inside')}>
-                    <IconButton
-                        icon="Plus"
-                        onClick={onAddNote}
-                        className="ml-1 hidden group-hover:block"
-                    ></IconButton>
-                </HotkeyTooltip>
+                        <HotkeyTooltip text={t('Add a page inside')}>
+                            <IconButton
+                                icon="Plus"
+                                onClick={onAddNote}
+                                className="ml-1"
+                            ></IconButton>
+                        </HotkeyTooltip>
+                    </>
+                )}
             </div>
 
             {!hasChildren && isExpanded && (

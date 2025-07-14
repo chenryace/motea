@@ -16,7 +16,7 @@
  */
 
 import { FC, useState, useEffect } from 'react';
-import TiptapEditorState from 'libs/web/state/tiptap-editor';
+import LexicalEditorState from 'libs/web/state/lexical-editor';
 import noteCache from 'libs/web/cache/note';
 
 interface UpdatedAtDisplayProps {
@@ -24,7 +24,7 @@ interface UpdatedAtDisplayProps {
 }
 
 const UpdatedAtDisplay: FC<UpdatedAtDisplayProps> = ({ className }) => {
-    const { note } = TiptapEditorState.useContainer();
+    const { note } = LexicalEditorState.useContainer();
     const [lastUpdatedTime, setLastUpdatedTime] = useState<Date | null>(null);
     const [isEditing, setIsEditing] = useState(false);
 
@@ -60,7 +60,8 @@ const UpdatedAtDisplay: FC<UpdatedAtDisplayProps> = ({ className }) => {
             setLastUpdatedTime(new Date(note.updated_at));
         }
 
-        const interval = setInterval(checkEditingStatus, 1000);
+        // 减少检查频率以降低内存使用，从1秒改为3秒
+        const interval = setInterval(checkEditingStatus, 3000);
 
         return () => {
             clearInterval(interval);

@@ -180,6 +180,9 @@ const NoteNav = () => {
                             iconClassName={classNames({
                                 'text-blue-500': note?.shared === NOTE_SHARED.PUBLIC,
                             })}
+                            style={{
+                                color: note?.shared === NOTE_SHARED.PUBLIC ? '#3185eb' : undefined
+                            }}
                             icon="Share"
                         />
                     </HotkeyTooltip>

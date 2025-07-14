@@ -15,7 +15,7 @@
  * copies or substantial portions of the Software.
  */
 
-import { FC, useState, useEffect, useCallback, useRef } from 'react';
+import { FC, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Button, makeStyles } from '@material-ui/core';
 import {
     EyeIcon,
@@ -24,8 +24,10 @@ import {
     CheckIcon,
     XIcon
 } from '@heroicons/react/outline';
-import TiptapEditorState from 'libs/web/state/tiptap-editor';
+import LexicalEditorState from 'libs/web/state/lexical-editor';
 import noteCache from 'libs/web/cache/note';
+import { setManagedInterval, setManagedTimeout, clearManagedTimer } from 'libs/web/utils/timer-manager';
+import { createContentComparator } from 'libs/web/utils/content-hash';
 
 interface SaveButtonProps {
     className?: string;
@@ -66,10 +68,10 @@ const useStyles = makeStyles({
         },
     },
     syncingButton: {
-        backgroundColor: '#2563EB !important',
+        backgroundColor: '#3185eb !important',
         color: '#FFFFFF !important',
         '&:hover': {
-            backgroundColor: '#1D4ED8 !important',
+            backgroundColor: '#2563EB !important',
         },
     },
     syncedButton: {
@@ -90,10 +92,13 @@ const useStyles = makeStyles({
 
 const SaveButton: FC<SaveButtonProps> = ({ className }) => {
     const classes = useStyles();
-    const { syncToServer, note } = TiptapEditorState.useContainer();
+    const { syncToServer, note } = LexicalEditorState.useContainer();
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('view');
     const syncedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+
+    const localContentComparator = useMemo(() => createContentComparator(), []);
 
     useEffect(() => {
         if (!note?.id) return;
@@ -103,20 +108,50 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
         const checkIndexedDBChanges = async () => {
             try {
                 const localNote = await noteCache.getItem(note.id);
-                if (localNote && localNote.content !== note.content) {
-                    if (!isEditing) {
-                        isEditing = true;
-                        setSyncStatus('save');
+                if (localNote) {
+                    if (localContentComparator.hasChanged(localNote.content)) {
+                        console.log('🔍 SaveButton: IndexedDB content changed, setting status to save');
+                        if (!isEditing) {
+                            isEditing = true;
+                            setSyncStatus('save');
+                        }
+                    }
+                } else {
+                    if (isEditing) {
+                        isEditing = false;
+                        setSyncStatus('view');
                     }
                 }
             } catch (error) {
+                console.error('SaveButton check error:', error);
             }
         };
 
-        const interval = setInterval(checkIndexedDBChanges, 1000);
+        const initializeComparator = async () => {
+            try {
+                const localNote = await noteCache.getItem(note.id);
+                if (localNote) {
+                    localContentComparator.updateBaseline(localNote.content);
+                    setSyncStatus('view');
+                    isEditing = false;
+                } else {
+                    setSyncStatus('view');
+                    isEditing = false;
+                }
+            } catch (error) {
+                setSyncStatus('view');
+                isEditing = false;
+            }
+        };
+
+        initializeComparator();
+        const timerId = `save-button-check-${note.id}`;
+        setManagedInterval(timerId, checkIndexedDBChanges, 1000);
 
         return () => {
-            clearInterval(interval);
+            clearManagedTimer(timerId);
+            clearManagedTimer(`save-button-sync-timeout-${note?.id || 'unknown'}`);
+            clearManagedTimer(`save-button-synced-timeout-${note?.id || 'unknown'}`);
             if (syncedTimeoutRef.current) {
                 clearTimeout(syncedTimeoutRef.current);
             }
@@ -129,6 +164,14 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
     const handleSave = useCallback(async () => {
         setSyncStatus('syncing');
 
+
+        const syncTimeoutId = `save-button-sync-timeout-${note?.id || 'unknown'}`;
+        const syncedTimeoutId = `save-button-synced-timeout-${note?.id || 'unknown'}`;
+
+        clearManagedTimer(syncTimeoutId);
+        clearManagedTimer(syncedTimeoutId);
+
+
         if (syncedTimeoutRef.current) {
             clearTimeout(syncedTimeoutRef.current);
         }
@@ -136,40 +179,48 @@ const SaveButton: FC<SaveButtonProps> = ({ className }) => {
             clearTimeout(syncTimeoutRef.current);
         }
 
-        syncTimeoutRef.current = setTimeout(() => {
+
+        setManagedTimeout(syncTimeoutId, () => {
             setSyncStatus('fail');
-            setTimeout(() => {
+            setManagedTimeout(`${syncTimeoutId}-reset`, () => {
                 setSyncStatus('view');
             }, 2000);
         }, 30000);
 
         try {
-            const success = await syncToServer();
+            await syncToServer();
 
+            // 清理超时定时器
+            const syncTimeoutId = `save-button-sync-timeout-${note?.id || 'unknown'}`;
+            const syncedTimeoutId = `save-button-synced-timeout-${note?.id || 'unknown'}`;
+
+            clearManagedTimer(syncTimeoutId);
+
+            // 兼容性：清理旧的ref定时器
             if (syncTimeoutRef.current) {
                 clearTimeout(syncTimeoutRef.current);
                 syncTimeoutRef.current = null;
             }
 
-            if (success) {
-                setSyncStatus('synced');
+            setSyncStatus('synced');
 
-                syncedTimeoutRef.current = setTimeout(() => {
-                    setSyncStatus('view');
-                }, 3000);
-            } else {
-                setSyncStatus('fail');
-                setTimeout(() => {
-                    setSyncStatus('view');
-                }, 2000);
-            }
+
+            setManagedTimeout(syncedTimeoutId, () => {
+                setSyncStatus('view');
+            }, 2000);
+
         } catch (error) {
+            const syncTimeoutId = `save-button-sync-timeout-${note?.id || 'unknown'}`;
+            clearManagedTimer(syncTimeoutId);
             if (syncTimeoutRef.current) {
                 clearTimeout(syncTimeoutRef.current);
                 syncTimeoutRef.current = null;
             }
+
             setSyncStatus('fail');
-            setTimeout(() => {
+
+
+            setManagedTimeout(`save-button-fail-reset-${note?.id || 'unknown'}`, () => {
                 setSyncStatus('view');
             }, 2000);
         }

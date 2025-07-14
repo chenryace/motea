@@ -76,41 +76,61 @@ const MobileMainWrapper: FC<{ children: ReactNodeLike }> = ({ children }) => {
     );
 };
 
+// 提取状态提供者组合
+const StateProviders: FC<{ tree?: TreeModel; note?: NoteModel; children: ReactNodeLike }> = ({
+    tree,
+    note,
+    children
+}) => (
+    <NoteTreeState.Provider initialState={tree}>
+        <NoteState.Provider initialState={note}>
+            {children}
+        </NoteState.Provider>
+    </NoteTreeState.Provider>
+);
+
+// 提取模态框组合
+const ModalGroup: FC = () => (
+    <>
+        <TrashState.Provider>
+            <TrashModal />
+        </TrashState.Provider>
+        <SearchState.Provider>
+            <SearchModal />
+        </SearchState.Provider>
+        <ShareModal />
+        <PreviewModal />
+        <LinkToolbar />
+        <SidebarMenu />
+        <EditorWidthSelect/>
+    </>
+);
+
+// 提取主布局选择逻辑
+const MainLayoutSelector: FC<{ children: ReactNodeLike }> = ({ children }) => {
+    const { ua } = UIState.useContainer();
+
+    if (ua?.isMobileOnly) {
+        return <MobileMainWrapper>{children}</MobileMainWrapper>;
+    }
+
+    return <MainWrapper>{children}</MainWrapper>;
+};
+
 const LayoutMain: FC<{
     tree?: TreeModel;
     note?: NoteModel;
     children: ReactNodeLike;
 }> = ({ children, tree, note }) => {
-    const { ua } = UIState.useContainer();
-
     useEffect(() => {
         document.body.classList.add('overscroll-none');
     }, []);
 
     return (
-        <NoteTreeState.Provider initialState={tree}>
-            <NoteState.Provider initialState={note}>
-                {/* main layout */}
-                {ua?.isMobileOnly ? (
-                    <MobileMainWrapper>{children}</MobileMainWrapper>
-                ) : (
-                    <MainWrapper>{children}</MainWrapper>
-                )}
-
-                {/* modals */}
-                <TrashState.Provider>
-                    <TrashModal />
-                </TrashState.Provider>
-                <SearchState.Provider>
-                    <SearchModal />
-                </SearchState.Provider>
-                <ShareModal />
-                <PreviewModal />
-                <LinkToolbar />
-                <SidebarMenu />
-                <EditorWidthSelect/>
-            </NoteState.Provider>
-        </NoteTreeState.Provider>
+        <StateProviders tree={tree} note={note}>
+            <MainLayoutSelector>{children}</MainLayoutSelector>
+            <ModalGroup />
+        </StateProviders>
     );
 };
 
