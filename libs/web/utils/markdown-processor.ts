@@ -1,101 +1,403 @@
-import MarkdownIt from 'markdown-it';
-
 /**
- * Markdown 处理器 - 专门用于处理导入的 markdown 文件
- * 将原始 markdown 内容转换为 TipTap 编辑器可以理解的格式
+ * Lexical Markdown Processor
+ *
+ * Copyright (c) 2025 waycaan
+ * Licensed under the MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
  */
-class MarkdownProcessor {
-    private md: MarkdownIt;
+class LexicalMarkdownProcessor {
 
-    constructor() {
-        this.md = new MarkdownIt({
-            html: true,        // 允许 HTML 标签
-            linkify: true,     // 自动转换 URL 为链接
-            typographer: true, // 启用一些语言中性的替换 + 引号美化
-            breaks: true,      // 将换行符转换为 <br>
-        });
-    }
 
-    /**
-     * 将 markdown 内容转换为 HTML
-     * TipTap 可以直接解析 HTML 内容并正确渲染
-     */
-    markdownToHtml(markdown: string): string {
+    processMarkdown(markdown: string): string {
         if (!markdown || markdown.trim() === '') {
-            return '<p></p>';
+            return '';
         }
 
         try {
-            // 使用 markdown-it 将 markdown 转换为 HTML
-            const html = this.md.render(markdown);
-            
-            // 如果转换结果为空，返回一个空段落
-            if (!html || html.trim() === '') {
-                return '<p></p>';
-            }
+            let cleanMarkdown = markdown;
 
-            return html;
+            cleanMarkdown = cleanMarkdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            cleanMarkdown = cleanMarkdown.trim();
+            cleanMarkdown = cleanMarkdown.replace(/^(\s*)-\s*\[\s*\]\s*/gm, '$1- [ ] ');
+            cleanMarkdown = cleanMarkdown.replace(/^(\s*)-\s*\[x\]\s*/gm, '$1- [x] ');
+
+            return cleanMarkdown;
         } catch (error) {
-            console.error('Error converting markdown to HTML:', error);
-            // 如果转换失败，将原始内容包装在 <p> 标签中
-            return `<p>${this.escapeHtml(markdown)}</p>`;
+            console.error('Error processing markdown:', error);
+            return markdown;
         }
     }
 
-    /**
-     * 转义 HTML 特殊字符
-     */
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
-    /**
-     * 检查内容是否看起来像 markdown
-     */
     isMarkdownContent(content: string): boolean {
         if (!content || content.trim() === '') {
             return false;
         }
 
-        // 检查常见的 markdown 语法
+
         const markdownPatterns = [
-            /^#{1,6}\s+/m,           // 标题 # ## ###
-            /^\*\s+/m,               // 无序列表 *
-            /^-\s+/m,                // 无序列表 -
-            /^\d+\.\s+/m,            // 有序列表 1.
-            /```[\s\S]*?```/,        // 代码块
-            /`[^`]+`/,               // 行内代码
-            /\*\*[^*]+\*\*/,         // 粗体
-            /\*[^*]+\*/,             // 斜体
-            /\[[^\]]+\]\([^)]+\)/,   // 链接
-            /!\[[^\]]*\]\([^)]+\)/,  // 图片
-            /^>\s+/m,                // 引用
-            /^\|.*\|$/m,             // 表格
-            /^---+$/m,               // 分隔线
+            /^#{1,6}\s+/m,
+            /^\*\s+/m,
+            /^-\s+/m,
+            /^\d+\.\s+/m,
+            /^-\s+\[[ x]\]\s+/m,
+            /```[\s\S]*?```/,
+            /`[^`]+`/,
+            /\*\*[^*]+\*\*/,
+            /\*[^*]+\*/,
+            /\[[^\]]+\]\([^)]+\)/,
+            /!\[[^\]]*\]\([^)]+\)/,
+            /^>\s+/m,
+            /^\|.*\|$/m,
+            /^---+$/m,
         ];
 
         return markdownPatterns.some(pattern => pattern.test(content));
     }
 
-    /**
-     * 处理导入的内容
-     * 如果是 markdown 格式，转换为 HTML；否则保持原样
-     */
-    processImportedContent(content: string): string {
-        if (this.isMarkdownContent(content)) {
-            console.log('Detected markdown content, converting to HTML...');
-            return this.markdownToHtml(content);
-        } else {
-            console.log('Content does not appear to be markdown, keeping as plain text...');
-            // 如果不是 markdown，将其包装在段落中以确保正确显示
-            return `<p>${this.escapeHtml(content)}</p>`;
+    private async createEditorTransformers() {
+        const {
+            TRANSFORMERS,
+            CHECK_LIST,
+            HEADING,
+            QUOTE,
+            CODE,
+            UNORDERED_LIST,
+            ORDERED_LIST,
+            BOLD_ITALIC_STAR,
+            BOLD_STAR,
+            ITALIC_STAR,
+            INLINE_CODE,
+            LINK,
+            HIGHLIGHT,
+            STRIKETHROUGH,
+            ElementTransformer,
+            TextFormatTransformer
+        } = await import('@lexical/markdown');
+
+        const { $isImageNode, ImageNode } = await import('../../../components/editor/nodes/image-node');
+        const { $isHorizontalRuleNode, HorizontalRuleNode } = await import('@lexical/react/LexicalHorizontalRuleNode');
+        const { $isTableNode, $isTableRowNode, $isTableCellNode, TableNode, TableRowNode, TableCellNode } = await import('@lexical/table');
+
+
+        const IMAGE_TRANSFORMER: ElementTransformer = {
+            dependencies: [ImageNode],
+            export: (node) => {
+                if (!$isImageNode(node)) {
+                    return null;
+                }
+                return `![${node.getAltText()}](${node.getSrc()})`;
+            },
+            regExp: /!\[([^\]]*)\]\(([^)]+)\)/,
+            replace: (parentNode, children, match) => {
+                const [, altText, src] = match;
+                const { $createImageNode } = require('../../../components/editor/nodes/image-node');
+                const imageNode = $createImageNode({
+                    altText,
+                    src,
+                    maxWidth: 800,
+                });
+                children.forEach(child => child.remove());
+                parentNode.append(imageNode);
+            },
+            type: 'element',
+        };
+
+        const UNDERLINE_TRANSFORMER: TextFormatTransformer = {
+            format: ['underline'],
+            tag: '<u>',
+            type: 'text-format',
+        };
+
+        const HR_TRANSFORMER: ElementTransformer = {
+            dependencies: [HorizontalRuleNode],
+            export: (node) => {
+                return $isHorizontalRuleNode(node) ? '---' : null;
+            },
+            regExp: /^(---|\*\*\*|___)\s?$/,
+            replace: (parentNode, _children, _match, isImport) => {
+                const { $createHorizontalRuleNode } = require('@lexical/react/LexicalHorizontalRuleNode');
+                const line = $createHorizontalRuleNode();
+                if (isImport || parentNode.getNextSibling() != null) {
+                    parentNode.replace(line);
+                } else {
+                    parentNode.insertBefore(line);
+                }
+                line.selectNext();
+            },
+            type: 'element',
+        };
+
+        const TABLE_TRANSFORMER: ElementTransformer = {
+            dependencies: [TableNode, TableRowNode, TableCellNode],
+            export: (node, traverseChildren) => {
+                if (!$isTableNode(node)) {
+                    return null;
+                }
+
+                const rows = node.getChildren();
+                let markdown = '\n';
+
+                rows.forEach((row, rowIndex) => {
+                    if ($isTableRowNode(row)) {
+                        const cells = row.getChildren();
+                        const cellTexts = cells.map(cell => {
+                            if ($isTableCellNode(cell)) {
+                                return traverseChildren(cell).trim() || ' ';
+                            }
+                            return ' ';
+                        });
+
+                        markdown += '| ' + cellTexts.join(' | ') + ' |\n';
+
+
+                        if (rowIndex === 0) {
+                            markdown += '| ' + cellTexts.map(() => '---').join(' | ') + ' |\n';
+                        }
+                    }
+                });
+
+                return markdown + '\n';
+            },
+            regExp: /^\|(.+)\|$/,
+            replace: (parentNode, children, match, isImport) => {
+                if (!isImport) return false;
+
+                try {
+                    const cellsText = match[1].split('|').map(cell => cell.trim());
+
+                    const tableNode = $createTableNode();
+                    const rowNode = $createTableRowNode();
+
+                    cellsText.forEach(cellText => {
+                        const cellNode = $createTableCellNode(1);
+                        const { $createParagraphNode, $createTextNode } = require('lexical');
+                        const paragraphNode = $createParagraphNode();
+                        const textNode = $createTextNode(cellText);
+                        paragraphNode.append(textNode);
+                        cellNode.append(paragraphNode);
+                        rowNode.append(cellNode);
+                    });
+
+                    tableNode.append(rowNode);
+                    parentNode.append(tableNode);
+
+                    return true;
+                } catch (error) {
+                    console.error('Table creation error:', error);
+                    return false;
+                }
+            },
+            type: 'element',
+        };
+
+        return [
+            CHECK_LIST,
+            ...TRANSFORMERS.filter(t => t !== CHECK_LIST),
+            HR_TRANSFORMER,
+            UNDERLINE_TRANSFORMER,
+            IMAGE_TRANSFORMER,
+            TABLE_TRANSFORMER
+        ];
+    }
+
+
+    async markdownToJSON(markdown: string): Promise<string> {
+        if (!markdown || markdown.trim() === '') {
+            return this.createEmptyEditorJSON();
         }
+
+        try {
+
+            const { createEditor } = await import('lexical');
+            const {
+                $convertFromMarkdownString,
+                TRANSFORMERS,
+                CHECK_LIST,
+                HEADING,
+                QUOTE,
+                CODE,
+                UNORDERED_LIST,
+                ORDERED_LIST,
+                BOLD_ITALIC_STAR,
+                BOLD_STAR,
+                ITALIC_STAR,
+                INLINE_CODE,
+                LINK,
+                HIGHLIGHT
+            } = await import('@lexical/markdown');
+            const { HeadingNode, QuoteNode } = await import('@lexical/rich-text');
+            const { ListNode, ListItemNode } = await import('@lexical/list');
+            const { CodeNode, CodeHighlightNode } = await import('@lexical/code');
+            const { LinkNode, AutoLinkNode } = await import('@lexical/link');
+            const { MarkNode } = await import('@lexical/mark');
+            const { TableNode, TableCellNode, TableRowNode } = await import('@lexical/table');
+            const { HorizontalRuleNode } = await import('@lexical/react/LexicalHorizontalRuleNode');
+
+            const COMPLETE_TRANSFORMERS = await this.createEditorTransformers();
+            const {
+                registerTableCellUnmergeTransform,
+                INSERT_TABLE_COMMAND,
+                $createTableNode,
+                $createTableRowNode,
+                $createTableCellNode
+            } = await import('@lexical/table');
+
+
+            const tempEditor = createEditor({
+                nodes: [
+                    HeadingNode,
+                    QuoteNode,
+                    ListNode,
+                    ListItemNode,
+                    CodeNode,
+                    CodeHighlightNode,
+                    LinkNode,
+                    AutoLinkNode,
+                    MarkNode,
+                    TableNode,
+                    TableCellNode,
+                    TableRowNode,
+                    HorizontalRuleNode,
+
+                ],
+                onError: (error) => console.error('Temp editor error:', error),
+            });
+
+            const unregisterTableTransform = registerTableCellUnmergeTransform(tempEditor);
+
+            let jsonResult = '';
+
+            await new Promise<void>((resolve) => {
+                tempEditor.update(() => {
+                    const cleanMarkdown = this.processMarkdown(markdown);
+                    $convertFromMarkdownString(cleanMarkdown, COMPLETE_TRANSFORMERS);
+                    resolve();
+                });
+            });
+
+
+            const editorState = tempEditor.getEditorState();
+            jsonResult = JSON.stringify(editorState.toJSON());
+
+            return jsonResult;
+        } catch (error) {
+            console.error('Error converting markdown to JSON:', error);
+
+            return this.createSimpleTextJSON(markdown);
+        }
+    }
+
+
+    private createEmptyEditorJSON(): string {
+        return JSON.stringify({
+            root: {
+                children: [
+                    {
+                        children: [],
+                        direction: null,
+                        format: "",
+                        indent: 0,
+                        type: "paragraph",
+                        version: 1
+                    }
+                ],
+                direction: null,
+                format: "",
+                indent: 0,
+                type: "root",
+                version: 1
+            }
+        });
+    }
+
+
+    private createSimpleTextJSON(text: string): string {
+        return JSON.stringify({
+            root: {
+                children: [
+                    {
+                        children: [
+                            {
+                                detail: 0,
+                                format: 0,
+                                mode: "normal",
+                                style: "",
+                                text: text,
+                                type: "text",
+                                version: 1
+                            }
+                        ],
+                        direction: null,
+                        format: "",
+                        indent: 0,
+                        type: "paragraph",
+                        version: 1
+                    }
+                ],
+                direction: null,
+                format: "",
+                indent: 0,
+                type: "root",
+                version: 1
+            }
+        });
+    }
+
+
+    async processImportedContent(content: string): Promise<string> {
+        if (this.isMarkdownContent(content)) {
+            console.log('Detected markdown content, converting to JSON for Lexical...');
+            return await this.markdownToJSON(content);
+        } else {
+            console.log('Content does not appear to be markdown, treating as plain text...');
+
+            return this.createSimpleTextJSON(content);
+        }
+    }
+
+
+    validateMarkdown(markdown: string): { isValid: boolean; errors: string[] } {
+        const errors: string[] = [];
+
+
+        const invalidCheckboxes = markdown.match(/^(\s*)-\s*\[[^\sx ]\]/gm);
+        if (invalidCheckboxes) {
+            errors.push(`Invalid checkbox format found: ${invalidCheckboxes.join(', ')}`);
+        }
+
+
+        const lines = markdown.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+
+            if (/^\s*\d+\.\s/.test(line)) {
+                const match = line.match(/^\s*(\d+)\.\s/);
+                if (match) {
+                    const num = parseInt(match[1]);
+
+                }
+            }
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors
+        };
     }
 }
 
-// 创建单例实例
-const markdownProcessor = new MarkdownProcessor();
 
-export default markdownProcessor;
+const lexicalMarkdownProcessor = new LexicalMarkdownProcessor();
+
+export default lexicalMarkdownProcessor;

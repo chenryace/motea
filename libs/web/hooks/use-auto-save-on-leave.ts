@@ -51,21 +51,17 @@ const useAutoSaveOnLeave = (options: UseAutoSaveOnLeaveOptions = {}) => {
         if (!enabled) return;
 
         if (shouldAutoSave()) {
-            // 显示确认对话框，但不执行任何保存操作
+            // 显示确认对话框
             event.preventDefault();
             event.returnValue = '您有未保存的更改。确定要离开吗？';
 
-            // 使用一个简单的延迟来检测用户选择
-            // 如果用户选择"离开"，页面会立即卸载，这个setTimeout不会执行
-            // 如果用户选择"取消"，这个setTimeout会在用户回到页面后执行
-            setTimeout(() => {
-                // 如果能执行到这里，说明用户选择了"取消"
-                performAutoSave();
-            }, 100);
+            // 重要：不执行任何保存操作！
+            // 用户选择"离开" = 放弃保存
+            // 用户选择"取消" = 留在页面，可以手动保存
 
             return '您有未保存的更改。确定要离开吗？';
         }
-    }, [enabled, shouldAutoSave, performAutoSave]);
+    }, [enabled, shouldAutoSave]);
 
     const handleRouteChangeStart = useCallback(async (url: string) => {
         if (!enabled || isAutoSavingRef.current) return;

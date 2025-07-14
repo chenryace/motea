@@ -29,6 +29,15 @@ export class InputStateTracker {
     private typingTimer: NodeJS.Timeout | null = null;
     private batchTimer: NodeJS.Timeout | null = null;
 
+    // 绑定的事件处理器引用，用于正确移除事件监听器
+    private boundHandlers = {
+        beforeInput: this.handleBeforeInput.bind(this),
+        input: this.handleInput.bind(this),
+        compositionStart: this.handleCompositionStart.bind(this),
+        compositionEnd: this.handleCompositionEnd.bind(this),
+        keyDown: this.handleKeyDown.bind(this),
+    };
+
     constructor(private options: {
         debug?: boolean;
         fastTypingThreshold?: number;
@@ -42,13 +51,11 @@ export class InputStateTracker {
         if (typeof window === 'undefined') return;
 
         // 监听各种输入事件
-        document.addEventListener('beforeinput', this.handleBeforeInput.bind(this), true);
-        document.addEventListener('input', this.handleInput.bind(this), true);
-        document.addEventListener('compositionstart', this.handleCompositionStart.bind(this), true);
-        document.addEventListener('compositionend', this.handleCompositionEnd.bind(this), true);
-        document.addEventListener('keydown', this.handleKeyDown.bind(this), true);
-
-
+        document.addEventListener('beforeinput', this.boundHandlers.beforeInput, true);
+        document.addEventListener('input', this.boundHandlers.input, true);
+        document.addEventListener('compositionstart', this.boundHandlers.compositionStart, true);
+        document.addEventListener('compositionend', this.boundHandlers.compositionEnd, true);
+        document.addEventListener('keydown', this.boundHandlers.keyDown, true);
     }
 
     private handleBeforeInput(event: InputEvent) {
@@ -193,20 +200,32 @@ export class InputStateTracker {
     destroy() {
         if (this.typingTimer) {
             clearTimeout(this.typingTimer);
+            this.typingTimer = null;
         }
         if (this.batchTimer) {
             clearTimeout(this.batchTimer);
+            this.batchTimer = null;
         }
 
-        document.removeEventListener('beforeinput', this.handleBeforeInput.bind(this), true);
-        document.removeEventListener('input', this.handleInput.bind(this), true);
-        document.removeEventListener('compositionstart', this.handleCompositionStart.bind(this), true);
-        document.removeEventListener('compositionend', this.handleCompositionEnd.bind(this), true);
-        document.removeEventListener('keydown', this.handleKeyDown.bind(this), true);
+        // 使用绑定的处理器引用来正确移除事件监听器
+        if (typeof window !== 'undefined') {
+            document.removeEventListener('beforeinput', this.boundHandlers.beforeInput, true);
+            document.removeEventListener('input', this.boundHandlers.input, true);
+            document.removeEventListener('compositionstart', this.boundHandlers.compositionStart, true);
+            document.removeEventListener('compositionend', this.boundHandlers.compositionEnd, true);
+            document.removeEventListener('keydown', this.boundHandlers.keyDown, true);
+        }
 
         this.listeners = [];
 
-
+        // 清理状态
+        this.state = {
+            isTyping: false,
+            isComposing: false,
+            isDeleting: false,
+            lastInputTime: 0,
+            inputBuffer: [],
+        };
     }
 }
 
@@ -221,6 +240,17 @@ export function getGlobalInputTracker(): InputStateTracker {
         globalInputTracker = new InputStateTracker();
     }
     return globalInputTracker;
+}
+
+/**
+ * 清理全局输入状态跟踪器
+ * 用于防止内存泄漏
+ */
+export function cleanupGlobalInputTracker(): void {
+    if (globalInputTracker) {
+        globalInputTracker.destroy();
+        globalInputTracker = null;
+    }
 }
 
 /**

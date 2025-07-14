@@ -1,5 +1,5 @@
 import { CSRF_HEADER_KEY } from 'libs/shared/const';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import CsrfTokenState from '../state/csrf-token';
 
 interface Params {
@@ -12,7 +12,17 @@ export default function useFetcher() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string>();
     const abortRef = useRef<AbortController>();
+    const mountedRef = useRef(true);
     const csrfToken = CsrfTokenState.useContainer();
+
+    // 清理函数，防止内存泄漏
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            abortRef.current?.abort();
+        };
+    }, []);
 
     const request = useCallback(
         async function request<Payload, ReponseData>(
@@ -58,11 +68,13 @@ export default function useFetcher() {
 
                 return response.json();
             } catch (e) {
-                if (!controller?.signal.aborted) {
+                if (!controller?.signal.aborted && mountedRef.current) {
                     setError(String(e));
                 }
             } finally {
-                setLoading(false);
+                if (mountedRef.current) {
+                    setLoading(false);
+                }
             }
         },
         [csrfToken]

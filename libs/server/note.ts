@@ -25,8 +25,12 @@ export const createNote = async (note: NoteModel, state: ServerState) => {
     };
     const metaData = jsonToMeta(metaWithModel);
 
+    // 检测内容格式并设置相应的 content type
+    const isJSON = content.trim().startsWith('{') && content.trim().endsWith('}');
+    const contentType = isJSON ? 'application/json' : 'text/markdown';
+
     await state.store.putObject(getPathNoteById(noteId), content, {
-        contentType: 'text/markdown',
+        contentType,
         meta: metaData,
     });
 

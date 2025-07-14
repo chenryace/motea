@@ -139,6 +139,8 @@ export class StorePostgreSQL extends StoreProvider {
             // Create performance indexes
             await this.createPerformanceIndexes(client);
 
+
+
             this.tablesInitialized = true;
             this.logger.info('Database tables initialized successfully');
         } catch (error) {
@@ -301,6 +303,11 @@ export class StorePostgreSQL extends StoreProvider {
                 const metadataWithoutId = { ...metadata };
                 delete metadataWithoutId.id;
 
+                // 检测内容格式并设置默认 content type
+                const defaultContentType = content && content.trim().startsWith('{') && content.trim().endsWith('}')
+                    ? 'application/json'
+                    : 'text/markdown';
+
                 await client.query(`
                     INSERT INTO notes (id, path, content, content_type, metadata, updated_at)
                     VALUES ($1, $2, $3, $4, $5, NOW())
@@ -314,7 +321,7 @@ export class StorePostgreSQL extends StoreProvider {
                     noteId,
                     fullPath,
                     content,
-                    options?.contentType || 'text/markdown',
+                    options?.contentType || defaultContentType,
                     JSON.stringify(metadataWithoutId)
                 ]);
 
@@ -549,6 +556,8 @@ export class StorePostgreSQL extends StoreProvider {
             client.release();
         }
     }
+
+
 
     async close(): Promise<void> {
         await this.pool.end();

@@ -45,9 +45,7 @@ export class IMEStateManager {
     constructor(options: { debug?: boolean } = {}) {
         this.debug = options.debug || false;
 
-        if (this.debug) {
-            console.log('🎯 IMEStateManager: Initialized with minimal intervention approach');
-        }
+
     }
 
     /**
@@ -91,17 +89,7 @@ export class IMEStateManager {
         if (shouldNotify) {
             this.notifyListeners();
 
-            if (this.debug) {
-                console.log('🎯 IMEStateManager: Composition state updated', {
-                    isComposing,
-                    data,
-                    compositionKey,
-                    range: options?.range,
-                    timestamp: now,
-                    environment: this.state.environment,
-                    anomalyCount: this.state.anomalyCount
-                });
-            }
+
         }
     }
 
@@ -225,9 +213,7 @@ export class IMEStateManager {
     destroy() {
         this.listeners.clear();
 
-        if (this.debug) {
-            console.log('🎯 IMEStateManager: Destroyed');
-        }
+
     }
 }
 
@@ -244,6 +230,17 @@ export function getGlobalIMEStateManager(): IMEStateManager {
         });
     }
     return globalIMEStateManager;
+}
+
+/**
+ * 清理全局IME状态管理器
+ * 用于防止内存泄漏
+ */
+export function cleanupGlobalIMEStateManager(): void {
+    if (globalIMEStateManager) {
+        globalIMEStateManager.destroy();
+        globalIMEStateManager = null;
+    }
 }
 
 /**
@@ -279,21 +276,14 @@ export function createSmartOnChange<T extends (...args: any[]) => any>(
     let timeoutId: NodeJS.Timeout | null = null;
 
     const executeCallback = (args: Parameters<T>) => {
-        if (debug) {
-            console.log('🎯 SmartOnChange: Executing callback');
-        }
+
         return originalCallback(...args);
     };
 
     const smartCallback = (...args: Parameters<T>) => {
         const state = stateManager.getState();
 
-        if (debug) {
-            console.log('🎯 SmartOnChange: Called', {
-                isComposing: state.isComposing,
-                shouldPause: stateManager.shouldPauseExpensiveOperations()
-            });
-        }
+
 
         // 如果正在IME输入，延迟执行
         if (stateManager.shouldPauseExpensiveOperations()) {

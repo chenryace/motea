@@ -23,11 +23,24 @@ function getRateLimitConfig(type: 'auth' | 'notes' | 'read' | 'general') {
         // 如果需要多实例，可以考虑 Redis 存储
         standardHeaders: true, // 返回标准的 `RateLimit-*` 头部
         legacyHeaders: false,  // 禁用 `X-RateLimit-*` 头部
-        
+
+        // 修复开发环境IP获取问题
+        keyGenerator: (req: any) => {
+            // 尝试多种方式获取客户端IP
+            const ip = req.ip ||
+                      req.connection?.remoteAddress ||
+                      req.socket?.remoteAddress ||
+                      req.headers['x-forwarded-for']?.split(',')[0] ||
+                      req.headers['x-real-ip'] ||
+                      '127.0.0.1'; // 开发环境默认IP
+            return ip;
+        },
+
         // 自定义错误响应
         handler: (req: any, res: any) => {
+            const ip = req.ip || req.connection?.remoteAddress || '127.0.0.1';
             logger.warn('Rate limit exceeded', {
-                ip: req.ip,
+                ip,
                 userAgent: req.headers['user-agent'],
                 path: req.url,
                 method: req.method,
@@ -39,10 +52,10 @@ function getRateLimitConfig(type: 'auth' | 'notes' | 'read' | 'general') {
                 status: 429,
             });
         },
-        
+
         // 跳过成功的请求计数（可选）
         skipSuccessfulRequests: false,
-        
+
         // 跳过失败的请求计数（可选）
         skipFailedRequests: false,
     };
@@ -99,9 +112,14 @@ export const generalRateLimit = rateLimit(getRateLimitConfig('general'));
  * 根据请求路径自动选择合适的限流策略
  */
 export function smartRateLimit(req: ApiRequest, res: ApiResponse, next: ApiNext) {
+    // 开发环境跳过限流，避免IP获取问题
+    if (process.env.NODE_ENV === 'development') {
+        return next();
+    }
+
     const path = req.url || '';
     const method = req.method || 'GET';
-    
+
     // 🔍 根据路径和方法选择限流策略
     if (path.includes('/api/auth') || path.includes('/api/login')) {
         // 认证相关

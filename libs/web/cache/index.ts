@@ -17,3 +17,5 @@ export interface NoteCacheItem extends NoteModel {
 
     linkIds?: string[];
 }
+
+

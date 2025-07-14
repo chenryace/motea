@@ -19,6 +19,7 @@ import { Pool } from 'pg';
 import { createLogger } from 'libs/server/debugging';
 import { TreeModel, DEFAULT_TREE, ROOT_ID, MovePosition, TreeItemModel } from 'libs/shared/tree';
 import TreeActions from 'libs/shared/tree';
+import { NOTE_DELETED, NOTE_SHARED, NOTE_PINNED } from 'libs/shared/meta';
 import { filter, forEach, isNil } from 'lodash';
 
 export interface TreeStoreConfig {
@@ -70,6 +71,7 @@ export class TreeStorePostgreSQL {
 
             if (result.rows.length === 0) {
                 const defaultTree = fixedTree(DEFAULT_TREE);
+
                 await client.query(`
                     INSERT INTO tree_data (id, data, updated_at)
                     VALUES ('main', $1, NOW())
@@ -149,6 +151,8 @@ export class TreeStorePostgreSQL {
         const tree = await this.get();
         return await this.set(TreeActions.deleteItem(tree, id));
     }
+
+
 
     async close(): Promise<void> {
         await this.pool.end();
